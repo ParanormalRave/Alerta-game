@@ -1,0 +1,397 @@
+/* ============================================================
+   THE CHRONICLES OF ZOAL — "EMBER ALMANAC" UI SYSTEM
+   Warm ink-on-parchment, hairline rules, registration ticks,
+   roman numerals, film grain. Diegetic occult field-manual.
+   Deliberately NOT: translucent rounded boxes, neon gradient
+   bars, gradient-fill uppercase titles, glow-on-everything.
+   ============================================================ */
+
+:root {
+  /* palette — warm charcoal ground, parchment ink */
+  --ink: #100e0b;
+  --ink-2: #17140f;
+  --paper: #e9dcc2;
+  --paper-dim: rgba(233, 220, 194, 0.56);
+  --paper-faint: rgba(233, 220, 194, 0.26);
+  --hair: rgba(233, 220, 194, 0.20);
+  --hair-soft: rgba(233, 220, 194, 0.10);
+
+  --ember: #ff5a1e;
+  --ember-soft: #f0894a;
+  --gold: #e8b15a;
+  --blood: #bb3a25;
+
+  /* per-realm accent — JS overrides --accent on <body data-realm> */
+  --accent: var(--ember);
+
+  --serif: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  --pad: clamp(16px, 2.2vw, 34px);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--mono);
+  cursor: default;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#game { display: block; width: 100vw; height: 100vh; }
+
+kbd {
+  font-family: var(--mono);
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.18em 0.5em;
+  color: var(--ink);
+  background: var(--paper);
+  border-radius: 1px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- grain + paper texture (full-screen overlays) ---------- */
+#grain {
+  position: fixed; inset: -50%;
+  width: 200%; height: 200%;
+  pointer-events: none; z-index: 40;
+  opacity: 0.05; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  animation: grain 0.5s steps(3) infinite;
+}
+@keyframes grain {
+  0% { transform: translate(0, 0); }
+  33% { transform: translate(-4%, 2%); }
+  66% { transform: translate(3%, -3%); }
+  100% { transform: translate(0, 0); }
+}
+#paper {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 41;
+  background:
+    radial-gradient(120% 90% at 50% 18%, transparent 52%, rgba(0, 0, 0, 0.42) 100%),
+    radial-gradient(80% 70% at 70% 30%, rgba(255, 120, 40, 0.04), transparent 60%);
+}
+
+/* ---------- damage / heal wash ---------- */
+#vignette {
+  position: fixed; inset: 0; pointer-events: none; z-index: 42;
+  box-shadow: inset 0 0 200px 30px rgba(150, 20, 10, 0);
+  transition: box-shadow 0.45s ease-out;
+}
+#vignette.hit { box-shadow: inset 0 0 260px 92px rgba(180, 18, 8, 0.76); transition: box-shadow 0.05s; }
+#vignette.critical { box-shadow: inset 0 0 320px 130px rgba(210, 0, 0, 0.88); transition: box-shadow 0.04s; }
+#vignette.heal { box-shadow: inset 0 0 220px 70px rgba(120, 190, 90, 0.32); transition: box-shadow 0.1s; }
+
+/* ============================================================ HUD */
+#hud {
+  position: fixed; inset: 0; z-index: 30;
+  pointer-events: none; user-select: none;
+}
+.lead { color: var(--accent); }
+.hidden { display: none !important; }
+
+/* ---------- crosshair ---------- */
+#crosshair {
+  position: absolute; top: 50%; left: 50%;
+  width: 26px; height: 26px; margin: -13px 0 0 -13px;
+  opacity: 0.85;
+}
+#crosshair .dot {
+  position: absolute; top: 50%; left: 50%;
+  width: 2px; height: 2px; margin: -1px 0 0 -1px;
+  background: var(--paper);
+}
+#crosshair .tick { position: absolute; background: var(--paper); }
+#crosshair .tick.t, #crosshair .tick.b { left: 50%; width: 1px; height: 6px; margin-left: -0.5px; }
+#crosshair .tick.l, #crosshair .tick.r { top: 50%; height: 1px; width: 6px; margin-top: -0.5px; }
+#crosshair .tick.t { top: 0; } #crosshair .tick.b { bottom: 0; }
+#crosshair .tick.l { left: 0; } #crosshair .tick.r { right: 0; }
+
+/* ---------- shared plate look ---------- */
+.plate-label {
+  font-family: var(--mono);
+  font-size: 10px; letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--paper-dim);
+}
+
+/* ---------- minimap (top-left) ---------- */
+#map-frame {
+  position: absolute; top: var(--pad); left: var(--pad);
+  padding: 9px;
+  background: rgba(16, 14, 11, 0.55);
+  border: 1px solid var(--hair);
+  backdrop-filter: blur(2px);
+}
+#map-frame::before, #map-frame::after {
+  content: ""; position: absolute; width: 9px; height: 9px;
+  border: 1px solid var(--accent); opacity: 0.8;
+}
+#map-frame::before { top: -1px; left: -1px; border-right: 0; border-bottom: 0; }
+#map-frame::after { bottom: -1px; right: -1px; border-left: 0; border-top: 0; }
+#minimap { display: block; width: 168px; height: 168px; image-rendering: pixelated; opacity: 0.92; }
+#map-frame figcaption {
+  margin-top: 7px; font-size: 9.5px; letter-spacing: 0.22em;
+  text-transform: uppercase; color: var(--paper-dim);
+}
+#map-frame.off { opacity: 0; transition: opacity 0.2s; }
+
+/* ---------- ember register (top-right) ---------- */
+#register { position: absolute; top: var(--pad); right: var(--pad); text-align: right; }
+.reg-head {
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  font-size: 10px; letter-spacing: 0.34em; text-transform: uppercase;
+  color: var(--paper-dim); margin-bottom: 12px;
+}
+.reg-head .rule { width: 54px; height: 1px; background: var(--hair); }
+.sigils { list-style: none; display: flex; gap: 14px; }
+.sigil {
+  position: relative; width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--hair);
+}
+.sigil::after {
+  content: attr(data-roman);
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-family: var(--serif); font-size: 12px; font-style: italic;
+  color: var(--paper-faint);
+}
+.sigil.filled {
+  border-color: var(--accent);
+  background: radial-gradient(circle at 50% 42%, rgba(255, 160, 90, 0.85), var(--accent) 70%);
+  box-shadow: 0 0 16px -2px var(--accent);
+}
+.sigil.filled::after { color: rgba(16, 14, 11, 0.85); }
+
+/* ---------- convergence tally (top-center, realm 5) ---------- */
+#tally {
+  position: absolute; top: calc(var(--pad) + 42px); left: 50%; transform: translateX(-50%);
+  text-align: center;
+  padding: 8px 18px;
+  background: rgba(16, 14, 11, 0.72);
+  border: 1px solid var(--accent);
+}
+.tally-num { font-family: var(--serif); font-size: 48px; font-weight: 700; line-height: 1; }
+.tally-num i { font-style: italic; font-size: 22px; color: var(--accent); }
+.tally-goal { display: block; margin-top: 4px; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--paper); }
+
+/* ---------- boss meter (top full width) ---------- */
+#boss { position: absolute; top: var(--pad); left: 50%; transform: translateX(-50%); width: min(720px, 76vw); padding: 8px 12px; background: rgba(16,14,11,0.66); border: 1px solid var(--hair); }
+.boss-line { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.boss-name { font-family: var(--serif); font-style: italic; font-size: 19px; letter-spacing: 0.01em; }
+.boss-weak { font-size: 9.5px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--accent); }
+.boss-meter { position: relative; height: 12px; background: rgba(0, 0, 0, 0.6); border: 1px solid var(--hair); }
+#boss-fill { position: absolute; inset: 0; width: 100%; transform-origin: left; background: linear-gradient(180deg, var(--blood), #7a2014); transition: transform 0.25s ease-out; }
+.boss-ph { position: absolute; top: -2px; bottom: -2px; width: 1px; background: var(--paper); opacity: 0.5; }
+.boss-ph.p1 { left: 66%; } .boss-ph.p2 { left: 33%; }
+
+/* ---------- vitals (bottom-left) ---------- */
+#vitals { position: absolute; left: var(--pad); bottom: var(--pad); width: 340px; padding: 12px 14px; background: rgba(16,14,11,0.66); border: 1px solid var(--hair); transition: border-color 0.3s, box-shadow 0.3s; }
+.vital { display: grid; grid-template-columns: 76px 1fr 58px; align-items: center; gap: 10px; margin-top: 9px; }
+.vlabel { font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--paper); }
+.gauge { position: relative; height: 22px; background: rgba(0, 0, 0, 0.62); border: 1px solid var(--hair); overflow: hidden; }
+.gauge.sm { height: 10px; }
+.gauge-fill { position: absolute; inset: 0; transform-origin: left; transition: transform 0.2s ease-out, background 0.4s; }
+.gauge-fill.health { background: linear-gradient(180deg, #ff5a2e, var(--blood) 55%, #7a2014); box-shadow: inset 0 0 12px rgba(255,120,60,0.4); }
+.gauge-fill.stamina { background: var(--gold); opacity: 0.8; }
+.vnum { font-family: var(--serif); font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; line-height: 1; }
+.vnum.dim { color: var(--paper-dim); font-size: 13px; }
+
+/* low HP: make it scream */
+body.low-hp #vitals { border-color: var(--blood); animation: lowhp-plate 0.85s ease-in-out infinite; }
+body.low-hp .vnum:not(.dim) { color: #ff6a40; }
+@keyframes lowhp-plate {
+  0%, 100% { box-shadow: 0 0 0 rgba(200,30,15,0); }
+  50% { box-shadow: 0 0 28px -3px rgba(210,32,16,0.85); }
+}
+/* red screen-edge heartbeat — its own overlay so it never fights #vignette */
+body.low-hp::after {
+  content: ""; position: fixed; inset: 0; z-index: 29; pointer-events: none;
+  box-shadow: inset 0 0 180px 40px rgba(170,18,8,0.0);
+  animation: lowhp-edge 0.85s ease-in-out infinite;
+}
+@keyframes lowhp-edge {
+  0%, 100% { box-shadow: inset 0 0 160px 30px rgba(170,18,8,0.12); }
+  50% { box-shadow: inset 0 0 220px 70px rgba(200,24,10,0.42); }
+}
+
+/* ---------- armament readout (bottom-right) ---------- */
+#arm { position: absolute; right: var(--pad); bottom: var(--pad); text-align: right; padding: 10px 12px; background: rgba(16,14,11,0.62); border: 1px solid var(--hair); }
+.arm-name { font-family: var(--serif); font-style: italic; font-size: 26px; line-height: 1; }
+.arm-meta { display: flex; gap: 14px; justify-content: flex-end; margin-top: 6px; }
+.arm-slot {
+  font-family: var(--serif); font-size: 12px; font-style: italic;
+  width: 20px; height: 20px; border: 1px solid var(--accent); border-radius: 50%;
+  display: grid; place-items: center; color: var(--accent);
+}
+.arm-fig { font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--paper-dim); align-self: center; }
+
+/* ---------- interaction prompt (center) ---------- */
+#prompt {
+  position: absolute; top: 60%; left: 50%; transform: translate(-50%, 6px);
+  display: flex; align-items: center; gap: 12px;
+  font-size: clamp(15px, 1.8vw, 20px); font-weight: 700; letter-spacing: 0.1em; text-transform: lowercase;
+  color: #fff; opacity: 0;
+  padding: 9px 18px; background: rgba(16, 14, 11, 0.82);
+  border: 1px solid var(--accent); border-radius: 2px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.6);
+  text-shadow: 0 1px 6px rgba(0,0,0,0.8);
+  transition: opacity 0.18s, transform 0.18s;
+}
+#prompt.show { opacity: 1; transform: translate(-50%, 0); }
+#prompt kbd { font-size: 0.9em; }
+#prompt #prompt-text::first-letter { text-transform: none; }
+
+#objective {
+  position: absolute; left: 50%; top: calc(var(--pad) + 10px); transform: translateX(-50%);
+  max-width: min(680px, 84vw); padding: 4px 10px; pointer-events: none;
+  color: var(--paper); text-align: center; line-height: 1.22;
+  font-family: var(--serif); font-weight: 800; font-size: clamp(17px, 2.3vw, 25px);
+  letter-spacing: 0.01em;
+  text-shadow: 0 2px 16px rgba(0,0,0,0.92), 0 0 3px rgba(0,0,0,0.85);
+  opacity: 0;
+}
+/* punch in, hold, then fade away so it reads as a called-out beat, not clutter */
+#objective.show { animation: objective 6.5s ease-out forwards; }
+@keyframes objective {
+  0%   { opacity: 0; transform: translate(-50%, -10px); letter-spacing: 0.2em; }
+  9%   { opacity: 1; transform: translate(-50%, 0);     letter-spacing: 0.01em; }
+  75%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -4px); }
+}
+#death-note {
+  position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
+  color: #fff; font-family: var(--serif); font-size: clamp(46px, 10vw, 110px);
+  background: rgba(90, 0, 0, 0.42);
+}
+#death-note span { font-family: var(--mono); font-size: 14px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--paper); }
+
+/* ---------- dialogue (hologram folio) ---------- */
+#dialogue {
+  position: absolute; left: 50%; bottom: 13%; transform: translateX(-50%);
+  width: min(680px, 80vw); padding: 20px 26px 16px;
+  background: rgba(14, 12, 9, 0.78);
+  border: 1px solid var(--hair);
+  border-left: 2px solid var(--accent);
+}
+#dialogue::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(180, 220, 255, 0.035) 3px, transparent 4px);
+}
+.speaker {
+  font-size: 12px; letter-spacing: 0.42em; text-transform: uppercase;
+  color: var(--accent); margin-bottom: 10px; font-weight: 700;
+}
+.folio { font-family: var(--serif); font-size: clamp(20px, 2.4vw, 26px); line-height: 1.5; min-height: 2.6em; color: #fbf3e2; }
+.folio .caret { color: var(--accent); animation: blink 0.9s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.dlg-foot { margin-top: 12px; font-size: 9px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--paper-faint); }
+
+/* ---------- briefing movement-lock banner ---------- */
+#briefing-lock {
+  position: absolute; left: 50%; top: 33%; transform: translate(-50%, -8px);
+  display: none; flex-direction: column; align-items: center; gap: 6px;
+  padding: 12px 26px; text-align: center;
+  background: rgba(16, 14, 11, 0.86); border: 1px solid var(--accent);
+  border-radius: 2px; box-shadow: 0 0 30px -6px rgba(0,0,0,0.8);
+}
+#briefing-lock.show { display: flex; animation: brief-pulse 1.6s ease-in-out infinite; }
+.bl-head { font-family: var(--serif); font-weight: 800; font-size: clamp(18px, 2.2vw, 26px); color: #fff; letter-spacing: 0.04em; }
+.bl-sub { font-size: 11px; letter-spacing: 0.26em; text-transform: uppercase; color: var(--accent); }
+.bl-keys { margin-top: 4px; font-size: 11px; letter-spacing: 0.1em; color: var(--paper-dim); }
+@keyframes brief-pulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(255,140,60,0); border-color: var(--accent); }
+  50% { box-shadow: 0 0 26px -4px rgba(255,140,60,0.6); border-color: #ffd24a; }
+}
+
+/* ---------- chapter card (realm entry) ---------- */
+#chapter {
+  position: fixed; inset: 0; z-index: 35; display: grid; place-content: center; text-align: center;
+  pointer-events: none;
+}
+#chapter.show { animation: chapter 4.2s ease-in-out forwards; }
+@keyframes chapter {
+  0% { opacity: 0; } 14% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; }
+}
+.ch-no { font-size: 11px; letter-spacing: 0.5em; text-transform: uppercase; color: var(--accent); }
+.ch-title { font-family: var(--serif); font-size: clamp(44px, 8vw, 96px); font-weight: 600; line-height: 0.96; margin: 14px 0 8px; }
+.ch-sub { font-family: var(--serif); font-style: italic; font-size: clamp(16px, 2vw, 22px); color: var(--paper-dim); }
+
+/* ---------- scene fade / cutscene wash ---------- */
+#fade {
+  position: fixed; inset: 0; z-index: 50; pointer-events: none;
+  background: var(--ink); opacity: 0;
+  transition: opacity 0.5s ease;
+}
+#fade.show { opacity: 1; }
+
+/* ---------- always-on command legend (toggle: H) ---------- */
+#controls {
+  position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+  z-index: 45; pointer-events: none;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  gap: 7px 14px; max-width: 94vw; padding: 7px 16px;
+  background: rgba(16, 14, 11, 0.62); border: 1px solid var(--hair);
+  backdrop-filter: blur(2px);
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em;
+  color: var(--paper-dim); text-transform: lowercase;
+}
+#controls.hidden { display: none; }
+#controls .ctl-head { color: var(--accent); letter-spacing: 0.18em; }
+#controls ul { display: contents; list-style: none; }
+#controls li { white-space: nowrap; }
+#controls kbd { font-size: 0.9em; padding: 0.12em 0.4em; }
+#fade.flash { background: #fff; opacity: 1; transition: opacity 0.5s ease; }
+
+body.shake #game { animation: shake 0.18s linear; }
+@keyframes shake {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(6px, -3px); }
+  50% { transform: translate(-5px, 4px); }
+  75% { transform: translate(3px, 2px); }
+  100% { transform: translate(0, 0); }
+}
+
+/* ============================================================ TITLE / LOCK */
+#lock-overlay {
+  position: fixed; inset: 0; z-index: 60; cursor: pointer;
+  display: grid; place-content: center;
+  background:
+    radial-gradient(90% 70% at 30% 25%, rgba(255, 90, 30, 0.10), transparent 55%),
+    radial-gradient(120% 120% at 50% 120%, rgba(0, 0, 0, 0.7), transparent),
+    var(--ink);
+  transition: opacity 0.6s ease;
+}
+#lock-overlay.hidden { opacity: 0; pointer-events: none; display: grid !important; }
+.lock-grid { width: min(720px, 86vw); }
+.lock-mark { display: flex; align-items: baseline; gap: 14px; margin-bottom: 22px; }
+.lc-no { font-family: var(--serif); font-size: 26px; color: var(--accent); }
+.lc-kicker { font-size: 11px; letter-spacing: 0.46em; text-transform: uppercase; color: var(--paper-dim); }
+.lock-title { font-family: var(--serif); font-weight: 600; font-size: clamp(48px, 10vw, 124px); line-height: 0.9; letter-spacing: -0.01em; }
+.lock-title em { font-style: italic; font-weight: 400; color: var(--paper-dim); }
+.lock-sub { font-family: var(--serif); font-style: italic; font-size: clamp(20px, 3vw, 34px); color: var(--ember-soft); margin-top: 10px; }
+.lock-rule { height: 1px; background: var(--hair); margin: 30px 0; }
+.lock-enter {
+  font-size: 13px; letter-spacing: 0.36em; text-transform: uppercase; color: var(--paper);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+@keyframes breathe { 0%, 100% { opacity: 0.4; } 50% { opacity: 1; } }
+.lock-keys {
+  list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 22px;
+  margin: 30px 0 22px;
+}
+.lock-keys li { font-size: 11px; letter-spacing: 0.06em; color: var(--paper-dim); display: flex; gap: 8px; align-items: center; }
+.lock-foot { font-size: 10px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--paper-faint); }
+
+/* responsive squeeze */
+@media (max-width: 720px) {
+  .lock-keys { grid-template-columns: repeat(2, 1fr); }
+  #vitals { width: 200px; }
+}

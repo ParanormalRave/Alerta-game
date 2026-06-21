@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>The Chronicles of Zoal — Ember Awakening</title>
+
+    <!-- Ember Almanac type: Fraunces (display serif, optical) + JetBrains Mono (readouts) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..700&family=JetBrains+Mono:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- Render target -->
+    <canvas id="game"></canvas>
+
+    <!-- Film grain + paper tint (diegetic almanac texture) -->
+    <div id="grain" aria-hidden="true"></div>
+    <div id="paper" aria-hidden="true"></div>
+
+    <!-- Damage / heal screen wash -->
+    <div id="vignette" aria-hidden="true"></div>
+
+    <!-- =================== HUD =================== -->
+    <div id="hud">
+      <!-- Crosshair: hairline registration tick -->
+      <div id="crosshair">
+        <span class="tick t"></span><span class="tick b"></span>
+        <span class="tick l"></span><span class="tick r"></span>
+        <span class="dot"></span>
+      </div>
+
+      <!-- Top-left: minimap, framed like a plate -->
+      <figure id="map-frame">
+        <canvas id="minimap" width="200" height="200"></canvas>
+        <figcaption><span class="lead">PL.</span> survey · <span id="map-realm">hub</span></figcaption>
+      </figure>
+
+      <!-- Top-right: the ember register (I–IV) -->
+      <aside id="register">
+        <div class="reg-head"><span class="rule"></span><span>embers</span></div>
+        <ol class="sigils">
+          <li class="sigil" data-roman="I"></li>
+          <li class="sigil" data-roman="II"></li>
+          <li class="sigil" data-roman="III"></li>
+          <li class="sigil" data-roman="IV"></li>
+        </ol>
+      </aside>
+
+      <!-- Top-center: convergence tally (Realm 5 only) -->
+      <div id="tally" class="hidden">
+        <span class="tally-num"><span id="tally-pct">0</span><i>%</i></span>
+        <span class="tally-goal">of 75 · purge</span>
+      </div>
+
+      <!-- Top full-width: boss meter -->
+      <div id="boss" class="hidden">
+        <div class="boss-line">
+          <span class="boss-name" id="boss-name">—</span>
+          <span class="boss-weak" id="boss-weak">weak point</span>
+        </div>
+        <div class="boss-meter"><div id="boss-fill"></div><div class="boss-ph p1"></div><div class="boss-ph p2"></div></div>
+      </div>
+
+      <!-- Bottom-left: vitals plate -->
+      <section id="vitals">
+        <div class="vital">
+          <span class="vlabel">vitality</span>
+          <div class="gauge"><div id="health-fill" class="gauge-fill health"></div></div>
+          <span class="vnum" id="health-num">100</span>
+        </div>
+        <div class="vital">
+          <span class="vlabel">stamina</span>
+          <div class="gauge sm"><div id="stamina-fill" class="gauge-fill stamina"></div></div>
+          <span class="vnum dim" id="stamina-num">100</span>
+        </div>
+      </section>
+
+      <!-- Bottom-right: armament readout -->
+      <section id="arm">
+        <span class="arm-name" id="arm-name">Ashen Blade</span>
+        <span class="arm-meta"><span class="arm-slot" id="arm-slot">i</span><span class="arm-fig" id="arm-fig">no. 045</span></span>
+      </section>
+
+      <!-- Center: interaction prompt -->
+      <div id="prompt"><kbd>E</kbd><span id="prompt-text"></span></div>
+      <div id="objective">Find the Ember</div>
+      <div id="death-note" class="hidden">YOU FELL<br /><span>reforming at the last gate</span></div>
+
+      <!-- Movement-lock banner during briefings -->
+      <div id="briefing-lock">
+        <span class="bl-head">◇ hold position ◇</span>
+        <span class="bl-sub">finish the briefing to move</span>
+        <span class="bl-keys"><kbd>E</kbd> advance · <kbd>SPACE</kbd> skip</span>
+      </div>
+
+      <!-- Dialogue: hologram folio -->
+      <div id="dialogue" class="hidden">
+        <div class="speaker" id="dialogue-speaker">ANCIENT ORDER</div>
+        <p class="folio" id="dialogue-text"></p>
+        <div class="dlg-foot"><span id="dialogue-adv">space — skip · e — advance</span></div>
+      </div>
+    </div>
+
+    <!-- Transient chapter card (realm name on entry) -->
+    <div id="chapter" class="hidden">
+      <span class="ch-no" id="chapter-no">realm i</span>
+      <h2 class="ch-title" id="chapter-title">Cinderwood</h2>
+      <span class="ch-sub" id="chapter-sub">the ashen forest</span>
+    </div>
+
+    <!-- Scene-transition + cutscene wash -->
+    <div id="fade"></div>
+
+    <!-- No title screen: the game opens straight onto the crash-site cinematic.
+         A click anywhere engages mouse-look (pointer lock) and begins play. -->
+
+    <!-- Always-on command legend (outside #hud so it shows in the opening too).
+         Toggle with H. -->
+    <aside id="controls">
+      <span class="ctl-head">controls <kbd>H</kbd></span>
+      <ul>
+        <li><kbd>CLICK</kbd> begin / strike</li>
+        <li><kbd>WASD</kbd> move</li>
+        <li><kbd>MOUSE</kbd> look</li>
+        <li><kbd>1-8</kbd> switch weapon</li><li><kbd>Q</kbd> last weapon</li>
+        <li><kbd>R</kbd> reload</li>
+        <li><kbd>E</kbd> use / pickup</li>
+        <li><kbd>SPACE</kbd> leap</li>
+        <li><kbd>SHIFT</kbd> run</li>
+        <li><kbd>M</kbd> survey</li>
+        <li><kbd>ESC</kbd> free cursor</li>
+      </ul>
+    </aside>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
