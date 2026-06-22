@@ -31,10 +31,10 @@ export const REALMS = {
     ],
     boss: 'smolder_stag',
     props: [
-      { model: 'psx_dead_tree_pack.glb', fitSize: 4.0, shape: 'tree', count: 30, color: 0x261c14 },
-      { model: 'rocks_set2.glb', fitSize: 2.4, shape: 'rock', count: 16, color: 0x3a2218 },
+      { model: 'psx_dead_tree_pack.glb', fitSize: 4.0, shape: 'tree', count: 30, color: 0x261c14, collide: 0.6 },
+      { model: 'rocks_set2.glb', fitSize: 2.4, shape: 'rock', count: 16, color: 0x3a2218, collide: 1.1 },
       { model: 'human_skeleton.glb', fitSize: 1.8, shape: 'box', count: 10, color: 0xb8b0a0 },
-      { model: 'glowing_gem.glb', fitSize: 1.3, shape: 'crystal', count: 8, color: 0x3a2218, glow: 0xff5a1e },
+      { model: 'glowing_gem.glb', fitSize: 1.3, shape: 'crystal', count: 8, color: 0x3a2218, glow: 0xff5a1e, collide: 0.7 },
     ],
   },
   2: {
@@ -49,8 +49,8 @@ export const REALMS = {
     ],
     boss: 'archivist',
     props: [
-      { model: 'rocks_set_3.glb', fitSize: 2.8, shape: 'pillar', count: 18, color: 0x46506a },
-      { model: 'low_poly_crystal.glb', fitSize: 1.4, shape: 'crystal', count: 14, color: 0x2c3a4a, glow: 0x6fe0ff },
+      { model: 'rocks_set_3.glb', fitSize: 2.8, shape: 'pillar', count: 18, color: 0x46506a, collide: 1.0 },
+      { model: 'low_poly_crystal.glb', fitSize: 1.4, shape: 'crystal', count: 14, color: 0x2c3a4a, glow: 0x6fe0ff, collide: 0.7 },
       { model: 'low_poly_skeleton.glb', fitSize: 1.8, shape: 'box', count: 8, color: 0x9aa8b0 },
     ],
   },
@@ -66,9 +66,9 @@ export const REALMS = {
     ],
     boss: 'warlord_engine',
     props: [
-      { model: 'rocks_set2.glb', fitSize: 2.6, shape: 'box', count: 16, color: 0x4a3a2a },
+      { model: 'rocks_set2.glb', fitSize: 2.6, shape: 'box', count: 16, color: 0x4a3a2a, collide: 1.1 },
       { model: 'low_poly_skeleton_ribs.glb', fitSize: 1.8, shape: 'brute', count: 14, color: 0xb0a890 },
-      { model: 'psx_dead_tree_pack.glb', fitSize: 3.5, shape: 'tree', count: 12, color: 0x3a2c1c },
+      { model: 'psx_dead_tree_pack.glb', fitSize: 3.5, shape: 'tree', count: 12, color: 0x3a2c1c, collide: 0.6 },
     ],
   },
   4: {
@@ -83,8 +83,8 @@ export const REALMS = {
     ],
     boss: 'pale_twin',
     props: [
-      { model: 'psx_dead_tree_pack.glb', fitSize: 3.8, shape: 'tree', count: 24, color: 0x1e1430 },
-      { model: 'glowing_gem.glb', fitSize: 1.4, shape: 'crystal', count: 16, color: 0x2a1640, glow: 0x9a5cff },
+      { model: 'psx_dead_tree_pack.glb', fitSize: 3.8, shape: 'tree', count: 24, color: 0x1e1430, collide: 0.6 },
+      { model: 'glowing_gem.glb', fitSize: 1.4, shape: 'crystal', count: 16, color: 0x2a1640, glow: 0x9a5cff, collide: 0.7 },
       { model: 'human_skeleton.glb', fitSize: 1.8, shape: 'box', count: 10, color: 0x9a90a8 },
     ],
   },
@@ -104,8 +104,8 @@ export const REALMS = {
     ],
     boss: 'conqueror',
     props: [
-      { model: 'rocks_set_3.glb', fitSize: 3.0, shape: 'box', count: 12, color: 0x2c2030 },
-      { model: 'glowing_gem.glb', fitSize: 1.5, shape: 'crystal', count: 16, color: 0x3a2030, glow: 0xffd24a },
+      { model: 'rocks_set_3.glb', fitSize: 3.0, shape: 'box', count: 12, color: 0x2c2030, collide: 1.1 },
+      { model: 'glowing_gem.glb', fitSize: 1.5, shape: 'crystal', count: 16, color: 0x3a2030, glow: 0xffd24a, collide: 0.7 },
       { model: 'low_poly_skeleton.glb', fitSize: 1.8, shape: 'box', count: 12, color: 0xa098a8 },
     ],
   },
