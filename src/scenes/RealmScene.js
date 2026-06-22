@@ -6,8 +6,10 @@ import { EnemyBase } from '../enemies/EnemyBase.js';
 import { BossBase } from '../enemies/BossBase.js';
 import { EmberRock } from '../world/EmberRock.js';
 import { Portal } from '../world/PortalSystem.js';
-import { ENEMIES, BOSSES } from '../data/enemies.js';
+import { LootSystem } from '../world/LootSystem.js';
+import { ENEMIES, BOSSES, ENEMY_DAMAGE_SCALE } from '../data/enemies.js';
 import { WEAPONS } from '../data/weapons.js';
+import { PASSIVE_BY_REALM, upgradeName } from '../data/upgrades.js';
 import { setupAtmosphere, scatterProps } from './sceneUtils.js';
 import { applySkybox } from '../skybox/SkyboxManager.js';
 import {
@@ -16,8 +18,12 @@ import {
 import { PERF, scaledCount } from '../core/performance.js';
 import { TERRAIN_TYPE, TERRAIN_TYPES } from '../core/gameConfig.js';
 import { disposeObject } from '../core/meshUtils.js';
+import { resolveStatic, pushOutOfCircle, PLAYER_RADIUS } from '../world/Collision.js';
 
 const CENTER = new THREE.Vector3(0, 0, 0);
+// Small life reward per felled foe so attrition fights stay survivable (there's
+// no passive health regen during play). Capped at maxHealth in Player.heal().
+const HEAL_PER_KILL = 5;
 const PICKUP_BY_REALM = {
   1: ['ironbreaker'],
   2: ['ember_bow'],
@@ -86,13 +92,15 @@ export class RealmScene {
     this.world.update(spawn, 0);
     if (PERF.initialChunkBuildBudget >= 25) this.world.update(CENTER, 0);
 
-    // props
+    // props (solid ones also register circle colliders into this.colliders)
+    this.colliders = [];
     for (const p of realm.props) {
-      this.props.push(...scatterProps(ctx.assets, this.three, p, this.world, { radius: 70 }));
+      this.props.push(...scatterProps(ctx.assets, this.three, p, this.world, { radius: 70, colliders: this.colliders }));
     }
 
     // particle field (per-scene, one draw call)
     this.particles = new ParticleField(this.three);
+    this.loot = new LootSystem(this.three, this.world, ctx);
 
     this._buildWeaponPickups();
 
@@ -102,7 +110,7 @@ export class RealmScene {
       particles: this.particles,
       audio: ctx.audio, ui: ctx.ui, player: ctx.player, now: 0,
       onDeath: (e) => this._onEnemyDeath(e),
-      onAttack: (_e, dmg) => this._damagePlayer(dmg),
+      onAttack: (_e, dmg) => this._damagePlayer(dmg * ENEMY_DAMAGE_SCALE),
       onBossHit: (dmg) => this._damagePlayer(dmg),
       spawnAdds: (n, all) => this._spawnAdds(n, all),
       onInvert: (t) => ctx.engine.invertControls(t),
@@ -143,6 +151,9 @@ export class RealmScene {
       ? `Reach the light pillar and claim ${realm.ember.label}.`
       : `Find the light pillar. Defeat the guardian, then extract ${realm.ember.label}.`);
 
+    // The Ember (AI on 0G Compute) briefs the guardian on this realm.
+    ctx.ai?.briefRealm(realm);
+
     spawn.y = this.world.getGroundHeight(spawn.x, spawn.z);
     this.spawnPoint = spawn;
     return spawn;
@@ -162,6 +173,11 @@ export class RealmScene {
     this.three.add(e.group);
     this.enemies.push(e);
     return e;
+  }
+
+  resetActors() {
+    for (const e of this.enemies) e.resetToHome();
+    this.boss?.resetToHome?.();
   }
 
   _spawnAdds(n, all) {
@@ -213,6 +229,9 @@ export class RealmScene {
     this.three.add(this.boss.group);
     this.ctx.audio.playMusic('boss');
     this.ctx.ui.setObjective(`Boss awakened: strike the weak point, then extract ${this.realm.ember.label}.`);
+    // Realm V keeps its own scripted Conqueror dialogue; let the Ember taunt the
+    // ordinary realm guardians.
+    if (this.realm.index !== 5) this.ctx.ai?.bossTaunt(def.name, this.realm);
   }
 
   _onBossDefeated() {
@@ -224,11 +243,22 @@ export class RealmScene {
 
   _onEnemyDeath(e) {
     recordKill(this.realm.index);
+    this.loot?.dropEnemy(e);
+    // +HP on kill — refresh the vitals plate immediately so the bar ticks up.
+    const p = this.ctx.player;
+    if (p.health < p.maxHealth) {
+      p.heal(HEAL_PER_KILL);
+      this.ctx.ui.setHealth(p.health, p.maxHealth);
+    }
     this.ctx.audio.play('player_hit', { volume: 0.25, rate: 1.5 });
   }
 
   _damagePlayer(dmg) {
-    const dead = this.ctx.player.takeDamage(dmg);
+    // Ease the descent: every foe — ordinary enemies AND the realm guardians —
+    // hits for half until the final boss. Only the Conqueror (realm V, once the
+    // finale begins) lands at full force.
+    const finalBoss = this.realm.index === 5 && this.conquerorPhase;
+    const dead = this.ctx.player.takeDamage(dmg * (finalBoss ? 1 : 0.5));
     this.ctx.ui.damageFlash();
     this.ctx.ui.shake(dead ? 240 : 160);
     this.ctx.audio.play('player_hit');
@@ -249,17 +279,26 @@ export class RealmScene {
     }
     // realm V motherglass commit
     if (this.realm.index === 5 && this.conquerorPhase && this.slotsFilled < 4) {
-      if (p.distanceTo(this.ember.position) < this.ember.radius + 1) {
+      if (this._nearEmber(p)) {
         return { text: `commit ember ${this.slotsFilled + 1} of 4`, action: () => this._commitEmber() };
       }
     }
-    // ember extraction (only once its guardian is felled)
+    // ember extraction (only once its guardian is felled). Once the boss is
+    // down the ember MUST be claimable — use flat (xz) distance so a dip or rise
+    // in the terrain under the pillar can't push it out of reach.
     if (this.realm.index !== 5 && this.bossDefeated && !this.emberSecured) {
-      if (p.distanceTo(this.ember.position) < this.ember.radius + 1) {
+      if (this._nearEmber(p)) {
         return { text: `extract ${this.realm.ember.label}`, action: () => this._extractEmber() };
       }
     }
     return null;
+  }
+
+  /** Horizontal proximity to the ember pillar (ignores vertical terrain offset). */
+  _nearEmber(p) {
+    const dx = p.x - this.ember.position.x;
+    const dz = p.z - this.ember.position.z;
+    return dx * dx + dz * dz < (this.ember.radius + 1.5) ** 2;
   }
 
   _extractEmber() {
@@ -277,10 +316,19 @@ export class RealmScene {
     this.ctx.audio.play('heal_wave');
     this.returnPortal.setState('completed');
     this.emberSecured = true;
-    this.ctx.ui.setObjective('Ember secured. Return through the gold portal.');
+    const passiveId = PASSIVE_BY_REALM[this.realm.index];
+    if (passiveId && !gameState.passiveUpgrades.includes(passiveId)) {
+      const pos = this.ember.position.clone();
+      pos.x += 1.4;
+      this.loot.spawn('passive', pos, 1, { id: passiveId });
+      this.ctx.ui.setObjective(`Ember secured. Collect ${upgradeName(passiveId)}, then return through the gold portal.`);
+    } else {
+      this.ctx.ui.setObjective('Ember secured. Return through the gold portal.');
+    }
 
     // foes scatter into ash with the wave
     for (const e of this.enemies) if (!e.dead) e._die();
+    this.ctx.ai?.reactToEmber(this.realm, this.realm.ember.label);
     this.ctx.engine.save();
   }
 
@@ -319,6 +367,7 @@ export class RealmScene {
     this.world.update(playerPos, delta);
     this.atmo.dome.update(delta);
     this.particles.update(delta);
+    this.loot.update(delta, playerPos);
     this.ember.update(delta);
     this.returnPortal.update(delta, this.particles);
     for (const p of this.pickups) {
@@ -341,6 +390,7 @@ export class RealmScene {
       if (e.dead || e.engaged || !far) {
         const remove = e.update(delta, playerPos, this.ctx.player);
         if (remove) { this.three.remove(e.group); e.dispose(); this.enemies.splice(i, 1); }
+        else if (!e.dead) resolveStatic(e.position, e.radius, this.colliders, 1); // keep foes out of props
       }
     }
 
@@ -356,6 +406,15 @@ export class RealmScene {
       this.ctx.ui.showTally(Math.min(100, pct));
       if (pct >= this.realm.purgeGoal * 100) this._beginConquerorFinale();
     }
+
+    // collision: keep the guardian out of solid props, the foes, and the boss
+    resolveStatic(playerPos, PLAYER_RADIUS, this.colliders);
+    for (const e of this.enemies) {
+      if (!e.dead) pushOutOfCircle(playerPos, PLAYER_RADIUS, e.position.x, e.position.z, e.radius);
+    }
+    if (this.boss && !this.boss.dead) {
+      pushOutOfCircle(playerPos, PLAYER_RADIUS, this.boss.position.x, this.boss.position.z, this.boss.radius);
+    }
   }
 
   _beginConquerorFinale() {
@@ -366,6 +425,7 @@ export class RealmScene {
     // strip the most-recently-acquired passive (reincarnation cost)
     const lost = gameState.passiveUpgrades.pop();
     if (lost) console.log('[zoal] reincarnation cost — lost passive:', lost);
+    this.ctx.engine.applyPassiveUpgrades();
     this.ctx.player.health = this.ctx.player.maxHealth;
     this.ctx.ui.hideTally();
     this.ctx.ui.setObjective('Final trial: survive the Conqueror and strike the chest core.');
@@ -412,6 +472,7 @@ export class RealmScene {
 
   exit() {
     this.world.dispose();
+    this.loot?.dispose();
     for (const e of this.enemies) e.dispose();
     this.boss?.dispose();
     disposeScene(this.three);
