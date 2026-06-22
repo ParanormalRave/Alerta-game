@@ -6,6 +6,15 @@
  * swaps it in with no logic change. `shape` hints the placeholder silhouette.
  */
 
+/**
+ * Global balance knob: regular-enemy hits were draining the player's 100 HP far
+ * too fast (no health regen during play), so all enemy attack damage is scaled
+ * by this before it reaches the player. The per-enemy `damage` values below stay
+ * as the design intent; tweak this single number to make foes hit harder/softer.
+ * (Bosses are NOT affected — they use their own `damage` directly.)
+ */
+export const ENEMY_DAMAGE_SCALE = 0.5;
+
 export const ENEMIES = {
   ashling: {
     id: 'ashling', name: 'Ashling', model: 'alien_hominid.glb', fitSize: 2.0, shape: 'humanoid',
