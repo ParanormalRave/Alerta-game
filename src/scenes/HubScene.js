@@ -8,6 +8,7 @@ import { gameState, isPortalUnlocked } from '../data/gameState.js';
 import { PERF } from '../core/performance.js';
 import { SHIP_TO_USE } from '../core/gameConfig.js';
 import { mergeByMaterial, disposeObject } from '../core/meshUtils.js';
+import { resolveStatic, PLAYER_RADIUS } from '../world/Collision.js';
 
 // Keep the guardian on the deck: clamp to a disc that comfortably holds the
 // spawn + all five portals so you can't stroll off the mothership into the
@@ -27,10 +28,18 @@ const HUB_ROOM_HALF = new THREE.Vector3(
 );
 const HUB_ROOM_CENTER = new THREE.Vector3().subVectors(HUB_WALL_ANCHOR, HUB_ROOM_ANCHOR);
 HUB_ROOM_CENTER.y = HUB_WALL_ANCHOR.y - HUB_FLOOR_ANCHOR.y;
-// Fan the five gates wide across the hall (was cramped). Outermost sit at ±2×
-// spacing ≈ ±7.4, comfortably inside HUB_BOUND_RADIUS.
-const HUB_PORTAL_Z = -5.0;
-const HUB_PORTAL_SPACING = 3.7;
+// Ring the five gates evenly AROUND the central table/projector (origin) — a
+// regular pentagon at radius 5.6, apex on the far side (−z). The two near gates
+// flank the +z entrance so the guardian walks in from spawn between them and
+// then stands at the table, every portal facing inward toward them.
+const HUB_PORTAL_POINTS = [
+  [0, -5.6],      // far apex
+  [-5.33, -1.73], // far-left
+  [-3.29, 4.53],  // near-left (flanks the entrance)
+  [3.29, 4.53],   // near-right (flanks the entrance)
+  [5.33, -1.73],  // far-right
+];
+const HUB_PORTAL_SCALE = 0.58;
 
 /**
  * HubScene — the crashed mothership. Five portals fan across the hall (locked /
@@ -43,6 +52,7 @@ export class HubScene {
     this.ctx = ctx;
     this.three = new THREE.Scene();
     this.portals = [];
+    this.colliders = []; // solid fixtures (projector + portal frames)
   }
 
   get name() { return HUB.name; }
@@ -58,7 +68,6 @@ export class HubScene {
     if (SHIP_TO_USE === 2) {
       applySkybox(ctx.assets, this.three, {
         radius: 520,
-        force: true,
         onLoaded: (sky) => { this.hubSkybox = sky; },
       });
     }
@@ -125,6 +134,7 @@ export class HubScene {
     );
     proj.position.set(0, 0.25, 0);
     this.three.add(proj);
+    this.colliders.push({ x: 0, z: 0, r: 1.0 }); // can't walk through the projector
     const holo = new THREE.Mesh(
       new THREE.ConeGeometry(0.9, 2.2, 12, 1, true),
       new THREE.MeshBasicMaterial({ color: 0x6fd0ff, transparent: true, opacity: 0.12, side: THREE.DoubleSide })
@@ -201,14 +211,13 @@ export class HubScene {
   _buildPortals() {
     for (let n = 1; n <= 5; n++) {
       const realm = REALMS[n];
-      const t = n - 3;
-      const x = HUB_ROOM_CENTER.x + t * HUB_PORTAL_SPACING;
-      const z = HUB_ROOM_CENTER.z + HUB_PORTAL_Z + Math.abs(t) * 0.6; // shallow arc
-      const face = Math.atan2(x, -z);
+      const [x, z] = HUB_PORTAL_POINTS[n - 1];
+      const face = Math.atan2(-x, -z);
       const portal = new Portal(this.ctx.assets, { accent: new THREE.Color(realm.accent).getHex(), label: realm.name, target: n });
       portal.group.position.set(x, 0, z);
-      portal.group.scale.setScalar(SHIP_TO_USE === 2 ? 0.82 : 1);
+      portal.group.scale.setScalar(SHIP_TO_USE === 2 ? HUB_PORTAL_SCALE : 0.76);
       portal.group.rotation.y = face;
+      this.colliders.push({ x, z, r: 0.85 }); // solid portal frame
 
       const completed = gameState.completedRealms.includes(n);
       const unlocked = isPortalUnlocked(n);
@@ -237,6 +246,8 @@ export class HubScene {
 
     // wall collision: clamp the player onto the deck disc (runs after movement)
     if (playerPos) {
+      // push out of solid fixtures (projector + portal frames) first
+      resolveStatic(playerPos, PLAYER_RADIUS, this.colliders);
       const dx = playerPos.x;
       const dz = playerPos.z;
       const d2 = dx * dx + dz * dz;
