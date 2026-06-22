@@ -57,9 +57,13 @@ export class AssetLoader {
 
   _candidateUrls(name) {
     const compressedName = name.endsWith('.gltf') ? name.replace(/\.gltf$/i, '.glb') : name;
+    // Prefer the full /models/ originals: the /models-compressed/ variants were
+    // exported with their textures stripped (meshopt geometry only), so loading
+    // them first made every model render untextured. Compressed stays as a
+    // fallback only for models that have no original on disk.
     return [
-      this.compressedBase + compressedName,
       this.base + name,
+      this.compressedBase + compressedName,
     ];
   }
 
