@@ -20,8 +20,11 @@ export class EnemyBase {
     this.health = def.health;
     this.maxHealth = def.health;
     this.float = !!def.float;
-    this.hoverY = this.float ? 1.4 : 0;
+    this.hoverY = this.float ? 0.75 : 0;
+    // horizontal collision footprint (≈ a fraction of the model's fitted size)
+    this.radius = Math.min(1.2, Math.max(0.4, (def.fitSize ?? 2) * 0.22));
     this.dead = false;
+    this.deathNotified = false;
     this.engaged = false;
     this.lastEngageT = 0; // last time aggroed/hit — used to let far foes re-sleep
     this.removeAt = 0;
@@ -46,6 +49,11 @@ export class EnemyBase {
     this.attackCd = 0;
     this.staggerT = 0;
     this.hitFlash = 0;
+    this.burnT = 0;
+    this.burnDps = 0;
+    this.burnTick = 0;
+    this.slowT = 0;
+    this.vulnT = 0;
     this.home = spawnPos.clone();
     this.waypoint = new THREE.Vector3();
     this._pickWaypoint();
@@ -59,6 +67,30 @@ export class EnemyBase {
     const a = Math.random() * Math.PI * 2;
     const r = 4 + Math.random() * 6;
     this.waypoint.set(this.home.x + Math.cos(a) * r, 0, this.home.z + Math.sin(a) * r);
+  }
+
+  resetToHome() {
+    this.dead = false;
+    this.deathNotified = false;
+    this.health = this.maxHealth;
+    this.removeAt = 0;
+    this.engaged = false;
+    this.lastEngageT = 0;
+    this.attackCd = 0;
+    this.staggerT = 0;
+    this.hitFlash = 0;
+    this.burnT = 0;
+    this.burnDps = 0;
+    this.burnTick = 0;
+    this.slowT = 0;
+    this.vulnT = 0;
+    this.position.copy(this.home);
+    this.position.y = this._groundY(this.home.x, this.home.z);
+    this.visual.position.set(0, 0, 0);
+    this.visual.scale.setScalar(1);
+    this.visual.rotation.set(0, 0, 0);
+    this._setState('PATROL');
+    this._pickWaypoint();
   }
 
   _engage() { this.engaged = true; this.lastEngageT = this.ctx.now; }
@@ -118,6 +150,18 @@ export class EnemyBase {
 
     // feedback timers (visual bob/pop is applied in _animateBody at frame end)
     if (this.hitFlash > 0) this.hitFlash = Math.max(0, this.hitFlash - delta * 5);
+    if (this.burnT > 0) {
+      this.burnT = Math.max(0, this.burnT - delta);
+      this.burnTick += delta;
+      if (this.burnTick >= 0.5) {
+        this.burnTick = 0;
+        this.health -= this.burnDps * 0.5;
+        this.ctx.particles?.emit(this.position.clone().setY(this.position.y + 1), { count: 4, color: 0xff5a1e, speed: 1.5, spread: 0.5, life: 0.35, gravity: 1, up: 0.4 });
+        if (this.health <= 0) { this._die(); return false; }
+      }
+    }
+    if (this.slowT > 0) this.slowT = Math.max(0, this.slowT - delta);
+    if (this.vulnT > 0) this.vulnT = Math.max(0, this.vulnT - delta);
     if (this.attackCd > 0) this.attackCd -= delta;
     this.stateT += delta;
     this.moving = false;
@@ -127,7 +171,7 @@ export class EnemyBase {
 
     switch (this.state) {
       case 'PATROL': {
-        const reached = this._moveToward(this.waypoint.x, this.waypoint.z, def.speed * 0.5, delta) < 1.2;
+        const reached = this._moveToward(this.waypoint.x, this.waypoint.z, this._moveSpeed(def.speed * 0.5), delta) < 1.2;
         if (reached && this.stateT > 0.5) { this._pickWaypoint(); this.stateT = 0; }
         if (dist < def.detect) {
           this._engage();
@@ -141,7 +185,7 @@ export class EnemyBase {
         break;
       }
       case 'CHASE': {
-        this._moveToward(playerPos.x, playerPos.z, def.speed, delta);
+        this._moveToward(playerPos.x, playerPos.z, this._moveSpeed(def.speed), delta);
         if (dist <= def.attackRange) this._setState('ATTACK');
         else if (dist > def.detect * 1.5) this._setState('PATROL');
         break;
@@ -168,7 +212,7 @@ export class EnemyBase {
     // settle onto terrain (or hover)
     const fy = this._groundY(this.position.x, this.position.z);
     this.position.y += (fy - this.position.y) * Math.min(1, delta * 8);
-    if (this.float) this.position.y = fy + Math.sin(this.ctx.now * 2 + this.home.x) * 0.15;
+    if (this.float) this.position.y = fy + Math.sin(this.ctx.now * 2 + this.home.x) * 0.08;
 
     this._animateBody(delta); // bob/bounce + hit-pop
     return false; // not ready for removal
@@ -176,17 +220,37 @@ export class EnemyBase {
 
   _setState(s) { this.state = s; this.stateT = 0; }
 
+  _moveSpeed(base) {
+    return this.slowT > 0 ? base * 0.48 : base;
+  }
+
+  applyStatus(status, fromPos) {
+    if (!status || this.dead) return;
+    if (status.burn) { this.burnT = Math.max(this.burnT, status.burn); this.burnDps = Math.max(this.burnDps, 10); }
+    if (status.slow) this.slowT = Math.max(this.slowT, status.slow);
+    if (status.vuln) this.vulnT = Math.max(this.vulnT, status.vuln);
+    if (status.stagger) { this._setState('STAGGER'); this.staggerT = Math.max(this.staggerT, status.stagger); }
+    if (status.push && fromPos) {
+      _v.subVectors(this.position, fromPos).setY(0);
+      if (_v.lengthSq() > 0.001) this.position.addScaledVector(_v.normalize(), status.push);
+    }
+  }
+
   /** @returns {boolean} true if this hit killed the enemy */
   takeDamage(dmg, fromPos, weapon) {
     if (this.dead) return false;
     this._engage();
+    if (this.vulnT > 0) dmg *= 1.25;
+    this.applyStatus(weapon?.status, fromPos);
     this.health -= dmg;
     this.hitFlash = 1;
 
-    // knockback + brief stagger
+    // knockback + brief stagger — kept light so repeated swings don't shove the
+    // foe out of melee reach before it dies (the old big push made kills feel
+    // impossible). Heavy push is reserved for explicit `push` status effects.
     if (fromPos) {
       _v.subVectors(this.position, fromPos).setY(0).normalize();
-      const kb = weapon?.type === 'melee' ? 0.6 : 0.3;
+      const kb = weapon?.type === 'melee' ? 0.25 : 0.18;
       this.position.addScaledVector(_v, kb);
     }
     if (this.state !== 'STAGGER') { this._setState('STAGGER'); this.staggerT = 0.25; }
@@ -197,6 +261,8 @@ export class EnemyBase {
 
   _die() {
     this.dead = true;
+    if (this.deathNotified) return;
+    this.deathNotified = true;
     this._setState('DEAD');
     this.removeAt = this.ctx.now + 2.5;
     this.ctx.particles?.deathPuff(this.position.clone().setY(this.position.y + 1), this.def.death);
