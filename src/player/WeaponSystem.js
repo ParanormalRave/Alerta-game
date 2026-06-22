@@ -80,6 +80,16 @@ export class WeaponSystem {
     this._equipImmediate(this.owned[0]);
   }
 
+  /** All 8 weapons by slot, flagged owned/current — drives the armory panel. */
+  getLoadout() {
+    return Object.values(WEAPONS)
+      .sort((a, b) => a.slot - b.slot)
+      .map((w) => ({
+        slot: w.slot, name: w.name, type: w.type,
+        owned: this.owned.includes(w.id), current: w.id === this.currentId,
+      }));
+  }
+
   setOwned(ids) {
     const valid = ids.filter((id) => WEAPONS[id]);
     this.owned = valid.length ? [...new Set(valid)] : [...STARTING_LOADOUT];
