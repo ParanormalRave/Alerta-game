@@ -84,6 +84,7 @@ export class Engine {
     this._hubIntroShown = false;
     this._hudT = 0;
     this._footT = 0;
+    this._lastWeaponId = null;
 
     // Opening cinematic state (the crash site). While `opening`, the loop drives
     // the scene's camera instead of the FPS controller; the first pointer-lock
@@ -270,6 +271,7 @@ export class Engine {
     this._handleInteraction();
 
     if (this.input.wasPressed('KeyM')) this.ui.toggleMap();
+    if (this.input.wasPressed('KeyL')) this.ui.toggleLoadout(this.weapons.getLoadout());
 
     this._hudT += delta;
     if (this._hudT >= 1 / PERF.hudFps) {
@@ -296,6 +298,13 @@ export class Engine {
   _updateHud() {
     this.ui.setHealth(this.player.health, this.player.maxHealth);
     this.ui.setStamina(this.player.stamina, this.player.maxStamina);
+
+    // Flash the armory list whenever the equipped weapon changes (also refreshes
+    // it live while pinned open with L).
+    if (this.weapons.currentId !== this._lastWeaponId) {
+      this._lastWeaponId = this.weapons.currentId;
+      this.ui.flashLoadout(this.weapons.getLoadout());
+    }
 
     const scene = this.sceneManager.current;
     if (scene) {
