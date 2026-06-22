@@ -15,6 +15,20 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
+    <!-- Boot loader: a ~2.5s LOADING card, then it fades to reveal the opening.
+         Lives in the initial HTML so it paints before the JS module evaluates
+         (no black-canvas flash). Dismissed on a flat timer in main.js. -->
+    <div id="loader" aria-hidden="true">
+      <div class="loader-inner">
+        <span class="loader-kicker">The Chronicles of Zoal</span>
+        <div class="loader-line">
+          <span class="loader-word">LOADING</span>
+          <span class="loader-dots"><b>.</b><b>.</b><b>.</b></span>
+        </div>
+        <span class="loader-rule"><i></i></span>
+      </div>
+    </div>
+
     <!-- Render target -->
     <canvas id="game"></canvas>
 
@@ -85,6 +99,12 @@
         <span class="arm-name" id="arm-name">Ashen Blade</span>
         <span class="arm-meta"><span class="arm-slot" id="arm-slot">i</span><span class="arm-fig" id="arm-fig">no. 045</span></span>
       </section>
+
+      <!-- The Ember's voice (AI, via 0G Compute) — non-blocking whisper -->
+      <div id="ember-whisper" aria-live="polite">
+        <span class="ew-mark">◆</span>
+        <span class="ew-text"></span>
+      </div>
 
       <!-- Center: interaction prompt -->
       <div id="prompt"><kbd>E</kbd><span id="prompt-text"></span></div>
