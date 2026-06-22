@@ -64,8 +64,10 @@ export const ENEMIES = {
  */
 export const BOSSES = {
   smolder_stag: {
+    // Realm I's semi-boss — the first guardian, so it's lighter than the later
+    // realm bosses to ease the player into boss fights.
     id: 'smolder_stag', name: 'The Smolder Stag', model: 'under_world_demon.glb', fitSize: 5.0,
-    health: 600, speed: 3.2, damage: 24, weak: 'ember gem · forehead', accent: 0xff5a1e,
+    health: 420, speed: 3.2, damage: 20, weak: 'ember gem · forehead', accent: 0xff5a1e,
     color: 0x3a2218, scale: 2.4, death: 'ember',
     phases: [['charge', 'stomp'], ['summon', 'charge'], ['firering', 'stomp']],
   },
