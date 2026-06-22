@@ -22,10 +22,12 @@ export class HUD {
       objective: $('objective'), deathNote: $('death-note'),
       briefing: $('briefing-lock'),
       ember: $('ember-whisper'), emberText: $('ember-whisper')?.querySelector('.ew-text'),
+      loadout: $('loadout'), loadoutList: $('loadout')?.querySelector('.lo-list'),
     };
     this._vigT = 0;
     this._chapterTimer = 0;
     this._briefingOn = false;
+    this.loadoutPinned = false; // L keeps it open; otherwise it flashes on switch
   }
 
   /** Show/hide the "you can't move yet" briefing banner. */
@@ -109,6 +111,38 @@ export class HUD {
 
   setMapRealm(name) { this.el.mapRealm.textContent = name; }
   toggleMap() { this.el.mapFrame.classList.toggle('off'); }
+
+  // --- armory / loadout list ---
+  _renderLoadout(entries) {
+    if (!this.el.loadoutList) return;
+    this.el.loadoutList.innerHTML = entries.map((e) => (
+      `<li class="lo-row${e.owned ? '' : ' locked'}${e.current ? ' active' : ''}">` +
+      `<span class="lo-slot">${e.slot}</span>` +
+      `<span class="lo-name">${e.name}</span>` +
+      `<span class="lo-type">${e.owned ? e.type : 'locked'}</span></li>`
+    )).join('');
+  }
+
+  /** Briefly show the armory on weapon switch (unless pinned open via L). */
+  flashLoadout(entries, ms = 1800) {
+    if (!this.el.loadout) return;
+    this._renderLoadout(entries);
+    if (this.loadoutPinned) return; // pinned: already visible, just refreshed
+    this.el.loadout.classList.add('show');
+    clearTimeout(this._loadoutT);
+    this._loadoutT = setTimeout(() => this.el.loadout.classList.remove('show'), ms);
+  }
+
+  /** L: pin the armory open / closed. */
+  toggleLoadout(entries) {
+    if (!this.el.loadout) return;
+    this.loadoutPinned = !this.loadoutPinned;
+    this._renderLoadout(entries);
+    clearTimeout(this._loadoutT);
+    this.el.loadout.classList.toggle('show', this.loadoutPinned);
+  }
+
+  get loadoutVisible() { return this.loadoutPinned; }
 
   /** The Ember's AI voice (0G Compute). Non-blocking; auto-fades after `ms`. */
   emberWhisper(text, ms = 5200) {
