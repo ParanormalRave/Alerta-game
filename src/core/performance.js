@@ -2,7 +2,7 @@
 // 0 = pretty, 1 = balanced (smooth + good-looking — the demo default),
 // 2 = fast, 3 = emergency laptop/potato mode.
 // Bump this UP if the demo machine chugs, DOWN (to 0) for screenshots/trailer.
-export const PERFORMANCE_LEVEL = 1;
+export const PERFORMANCE_LEVEL = 2;
 
 const PROFILES = [
   {
@@ -73,7 +73,7 @@ const PROFILES = [
     portalParticleChance: 0.22,
     portalLights: true,
     dynamicPointLights: true,
-    renderDistance: 2,
+    renderDistance: 1,
     initialChunkBuildBudget: 25,
     maxChunkBuildsPerUpdate: 3,
     healUpdateInterval: 0.04,
@@ -87,12 +87,12 @@ const PROFILES = [
     enemyAiDistanceSq: 1600,
     enemyResleepDistanceSq: 4900,
     instanceProps: true,
-    preloadActors: true,
+    preloadActors: false,
     spawnAddsScale: 0.75,
     loadSkybox: false,
     loadPropModels: false, // instanced placeholder props — skips the 16MB rock GLBs
-    loadActorModels: true,
-    loadWeaponModels: true,
+    loadActorModels: false,
+    loadWeaponModels: false,
     loadCrashShipModel: true,
     crashEnvMap: false,
     crashTerrainSize: 48,
@@ -123,7 +123,7 @@ const PROFILES = [
     portalParticleChance: 0,
     portalLights: false,
     dynamicPointLights: false,
-    renderDistance: 2,
+    renderDistance: 1,
     initialChunkBuildBudget: 16,
     maxChunkBuildsPerUpdate: 2,
     healUpdateInterval: 0.08,
@@ -137,12 +137,12 @@ const PROFILES = [
     enemyAiDistanceSq: 1225,
     enemyResleepDistanceSq: 3600,
     instanceProps: true,
-    preloadActors: true,
+    preloadActors: false,
     spawnAddsScale: 0.5,
     loadSkybox: false,
     loadPropModels: false,
-    loadActorModels: true,
-    loadWeaponModels: true,
+    loadActorModels: false,
+    loadWeaponModels: false,
     loadCrashShipModel: false,
     crashEnvMap: false,
     crashTerrainSize: 40,
