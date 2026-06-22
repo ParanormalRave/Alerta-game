@@ -54,6 +54,7 @@ export class RealmScene {
     this.emberSecured = false;
     this.purgeTotal = 1;
     this.conquerorPhase = false;
+    this.enemiesPacified = false; // realm V: foes go still once the Conqueror falls
     this.slotsFilled = 0;
     this._t = 0;
 
@@ -110,7 +111,10 @@ export class RealmScene {
       particles: this.particles,
       audio: ctx.audio, ui: ctx.ui, player: ctx.player, now: 0,
       onDeath: (e) => this._onEnemyDeath(e),
-      onAttack: (_e, dmg) => this._damagePlayer(dmg * ENEMY_DAMAGE_SCALE),
+      onAttack: (_e, dmg) => {
+        if (this.enemiesPacified) return; // foes stand down once the Conqueror falls
+        this._damagePlayer(dmg * ENEMY_DAMAGE_SCALE * this._enemyDamageMul());
+      },
       onBossHit: (dmg) => this._damagePlayer(dmg),
       spawnAdds: (n, all) => this._spawnAdds(n, all),
       onInvert: (t) => ctx.engine.invertControls(t),
@@ -128,8 +132,10 @@ export class RealmScene {
     this.ember = new EmberRock(ctx.assets, {
       tint: realm.ember.tint, model: realm.ember.model || 'glowing_gem.glb', label: realm.ember.label,
     });
-    this.ember.group.position.copy(CENTER);
-    this.ember.group.position.y = this.world.getGroundHeight(0, 0);
+    // Seat the ember well away from the entry gate so reaching it is a journey
+    // through the realm, not a step off the portal.
+    const ez = -34;
+    this.ember.group.position.set(0, this.world.getGroundHeight(0, ez), ez);
     this.three.add(this.ember.group);
 
     // return gate behind spawn
@@ -220,8 +226,8 @@ export class RealmScene {
   _spawnBoss() {
     this.bossSpawned = true;
     const def = BOSSES[this.realm.boss];
-    const pos = CENTER.clone();
-    pos.y = this.world.getGroundHeight(0, 0);
+    const pos = this.ember.position.clone(); // the guardian stands over its ember
+    pos.y = this.world.getGroundHeight(pos.x, pos.z);
     this.boss = new BossBase(this.ctx.assets, def, pos, {
       ...this.ectx, onDefeated: () => this._onBossDefeated(),
       showBar: this.realm.index === 5, // full-width meter only for the Conqueror
@@ -236,17 +242,35 @@ export class RealmScene {
 
   _onBossDefeated() {
     this.bossDefeated = true;
-    if (this.realm.index === 5) { this._win(); return; }
+    if (this.realm.index === 5) {
+      // Felling the Conqueror stills the horde — but the world only heals once the
+      // embers are committed to the Motherglass.
+      this.enemiesPacified = true;
+      this.ctx.audio.playMusic('realm5');
+      this.ctx.ui.setObjective(`The Conqueror has fallen. Commit the embers to the Motherglass (${4 - this.slotsFilled} left).`);
+      this.ctx.dialogue.show('THE EMBER', [
+        'The Conqueror is ash. The horde stands down.',
+        'Now — set the embers into the Motherglass, and let the realms heal.',
+      ]);
+      return;
+    }
     this.ctx.audio.playMusic('realm' + this.realm.index);
     this.ctx.ui.setObjective(`Guardian defeated. Follow the light pillar and press E to extract ${this.realm.ember.label}.`);
+  }
+
+  /** Enemy hits start gentle and grow with each realm already conquered. */
+  _enemyDamageMul() {
+    return 0.7 + 0.18 * gameState.completedRealms.length;
   }
 
   _onEnemyDeath(e) {
     recordKill(this.realm.index);
     this.loot?.dropEnemy(e);
-    // +HP on kill — refresh the vitals plate immediately so the bar ticks up.
+    // HP-on-kill is a chance, not a guarantee — and it's far likelier once the
+    // Conqueror has arrived and the fight is at its most desperate.
     const p = this.ctx.player;
-    if (p.health < p.maxHealth) {
+    const healChance = this.conquerorPhase ? 0.7 : 0.3;
+    if (p.health < p.maxHealth && Math.random() < healChance) {
       p.heal(HEAL_PER_KILL);
       this.ctx.ui.setHealth(p.health, p.maxHealth);
     }
@@ -349,13 +373,27 @@ export class RealmScene {
   _commitEmber() {
     this.slotsFilled++;
     this.particles.healRing(this.ember.position.clone());
+    this.ctx.ui.healFlash();
     this.ctx.audio.play('ember_extract');
     if (this.slotsFilled >= 4) this._win();
+    else this.ctx.ui.setObjective(`Ember committed — ${4 - this.slotsFilled} to go.`);
   }
 
   _win() {
     if (this._won) return;
     this._won = true;
+    // Committing the embers (whether or not the Conqueror still stands) cleanses
+    // the realm: the horde and the boss dissolve and the world heals.
+    if (this.realm.index === 5) {
+      this.enemiesPacified = true;
+      for (const e of this.enemies) if (!e.dead) e._die();
+      if (this.boss && !this.boss.dead) {
+        this.particles.emberBurst(this.boss.position.clone());
+        this.boss.dead = true;
+        this.boss.mesh.visible = false;
+        this.ctx.ui.hideBoss();
+      }
+    }
     this.ctx.engine.winGame();
   }
 
@@ -428,11 +466,15 @@ export class RealmScene {
     this.ctx.engine.applyPassiveUpgrades();
     this.ctx.player.health = this.ctx.player.maxHealth;
     this.ctx.ui.hideTally();
-    this.ctx.ui.setObjective('Final trial: survive the Conqueror and strike the chest core.');
-    this.ctx.dialogue.show('THE CONQUEROR', [
-      'You burn so brightly, little guardian.',
-      'Then burn for me — one last time.',
-    ], () => this._spawnBoss());
+    this.ctx.ui.setObjective('Too late — the Conqueror has arrived. Fell it to still the horde, or commit the embers to end it all.');
+    this.ctx.dialogue.show('THE EMBER', [
+      'You were too slow, guardian — the purge did not finish in time.',
+      'The Conqueror walks among the horde now. You face them together.',
+      'Fell it to still the horde — or set the embers in the Motherglass and end it at once.',
+    ], () => {
+      this._spawnBoss();
+      this._spawnAdds(5, true); // the horde swells in with the final boss
+    });
   }
 
   // ---- engine queries ----
