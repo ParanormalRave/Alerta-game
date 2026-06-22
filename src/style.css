@@ -99,6 +99,30 @@ kbd {
 .lead { color: var(--accent); }
 .hidden { display: none !important; }
 
+#damage-numbers {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.dmg-number {
+  position: absolute;
+  left: 0;
+  top: 0;
+  min-width: 2ch;
+  font-family: var(--serif);
+  font-size: clamp(18px, 2vw, 28px);
+  font-weight: 800;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.85), 0 0 2px #000;
+  will-change: transform, opacity;
+}
+.dmg-number.crit {
+  font-size: clamp(24px, 2.8vw, 38px);
+  color: #fff2b8;
+}
+
 /* ---------- crosshair ---------- */
 #crosshair {
   position: absolute; top: 50%; left: 50%;
@@ -273,6 +297,24 @@ body.low-hp::after {
 }
 #death-note span { font-family: var(--mono); font-size: 14px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--paper); }
 
+/* ---------- the Ember's voice (AI via 0G Compute) ---------- */
+#ember-whisper {
+  position: absolute; left: 50%; bottom: 24%; transform: translate(-50%, 8px);
+  display: flex; align-items: baseline; gap: 10px;
+  max-width: min(640px, 82vw); padding: 6px 16px; pointer-events: none;
+  opacity: 0; transition: opacity 0.6s ease, transform 0.6s ease;
+}
+#ember-whisper.show { opacity: 1; transform: translate(-50%, 0); }
+#ember-whisper .ew-mark {
+  color: var(--accent); font-size: 12px; line-height: 1;
+  filter: drop-shadow(0 0 6px var(--accent)); animation: blink 2.4s steps(1) infinite;
+}
+#ember-whisper .ew-text {
+  font-family: var(--serif); font-style: italic; font-weight: 500;
+  font-size: clamp(16px, 2vw, 22px); line-height: 1.35;
+  color: #fbe9cf; text-shadow: 0 2px 14px rgba(0,0,0,0.9), 0 0 10px rgba(255,150,80,0.25);
+}
+
 /* ---------- dialogue (hologram folio) ---------- */
 #dialogue {
   position: absolute; left: 50%; bottom: 13%; transform: translateX(-50%);
@@ -394,4 +436,91 @@ body.shake #game { animation: shake 0.18s linear; }
 @media (max-width: 720px) {
   .lock-keys { grid-template-columns: repeat(2, 1fr); }
   #vitals { width: 200px; }
+}
+
+/* =================== Boot loader =================== */
+#loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: grid;
+  place-content: center;
+  background: radial-gradient(120% 80% at 50% 42%, var(--ink-2) 0%, var(--ink) 62%, #0a0806 100%);
+  color: var(--paper);
+  transition: opacity 0.8s ease;
+}
+/* faint ember haze breathing behind the text */
+#loader::before {
+  content: "";
+  position: absolute;
+  width: min(70vw, 620px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 90, 30, 0.14), transparent 62%);
+  filter: blur(8px);
+  animation: loaderHaze 3.6s ease-in-out infinite;
+}
+#loader.done { opacity: 0; pointer-events: none; }
+
+.loader-inner { position: relative; display: grid; justify-items: center; gap: 22px; text-align: center; }
+
+.loader-kicker {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: clamp(11px, 1.4vw, 14px);
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--gold);
+  opacity: 0.78;
+  padding-left: 0.42em; /* offset trailing letter-spacing → optical centering */
+}
+
+.loader-line { display: flex; align-items: baseline; gap: 4px; }
+
+.loader-word {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: clamp(2.6rem, 7vw, 4.2rem);
+  letter-spacing: 0.16em;
+  padding-left: 0.16em;
+  /* sweeping ember sheen across the letters */
+  background: linear-gradient(100deg, #7a5a32 0%, #ffce8a 26%, var(--ember) 50%, #ffce8a 74%, #7a5a32 100%);
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: loaderShimmer 2.8s linear infinite;
+}
+
+.loader-dots { display: inline-flex; gap: 2px; align-self: flex-end; padding-bottom: 0.55em; }
+.loader-dots b {
+  font: 600 clamp(2rem, 5vw, 3rem) / 1 var(--serif);
+  color: var(--ember-soft);
+  animation: loaderBlink 1.4s infinite both;
+}
+.loader-dots b:nth-child(2) { animation-delay: 0.22s; }
+.loader-dots b:nth-child(3) { animation-delay: 0.44s; }
+
+.loader-rule {
+  display: block;
+  width: clamp(170px, 24vw, 300px);
+  height: 1px;
+  background: var(--hair-soft);
+  overflow: hidden;
+}
+.loader-rule i {
+  display: block;
+  width: 38%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, var(--ember), transparent);
+  animation: loaderSweep 1.9s ease-in-out infinite;
+}
+
+@keyframes loaderShimmer { to { background-position: -240% 0; } }
+@keyframes loaderBlink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
+@keyframes loaderSweep { 0% { transform: translateX(-130%); } 100% { transform: translateX(330%); } }
+@keyframes loaderHaze { 0%, 100% { opacity: 0.5; transform: scale(0.96); } 50% { opacity: 1; transform: scale(1.04); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .loader-word, .loader-dots b, .loader-rule i, #loader::before { animation: none; }
 }
