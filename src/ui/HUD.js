@@ -21,6 +21,7 @@ export class HUD {
       mapFrame: $('map-frame'), mapRealm: $('map-realm'),
       objective: $('objective'), deathNote: $('death-note'),
       briefing: $('briefing-lock'),
+      ember: $('ember-whisper'), emberText: $('ember-whisper')?.querySelector('.ew-text'),
     };
     this._vigT = 0;
     this._chapterTimer = 0;
@@ -108,6 +109,18 @@ export class HUD {
 
   setMapRealm(name) { this.el.mapRealm.textContent = name; }
   toggleMap() { this.el.mapFrame.classList.toggle('off'); }
+
+  /** The Ember's AI voice (0G Compute). Non-blocking; auto-fades after `ms`. */
+  emberWhisper(text, ms = 5200) {
+    const e = this.el.ember;
+    if (!e || !this.el.emberText) return;
+    this.el.emberText.textContent = text;
+    e.classList.remove('show');
+    void e.offsetWidth; // restart the fade-in
+    e.classList.add('show');
+    clearTimeout(this._emberT);
+    this._emberT = setTimeout(() => e.classList.remove('show'), ms);
+  }
 
   // --- transitions ---
   fadeOut() { return new Promise((r) => { this.el.fade.classList.add('show'); setTimeout(r, 520); }); }
