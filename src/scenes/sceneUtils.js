@@ -37,8 +37,12 @@ export function setupAtmosphere(three, sky) {
   return { dome, hemi, key, fill };
 }
 
-/** Even-ish scatter of a prop GLB across a disc, seated on the terrain. */
-export function scatterProps(assets, three, prop, world, { center = { x: 0, z: 0 }, radius = 60, avoid = 8 } = {}) {
+/**
+ * Even-ish scatter of a prop GLB across a disc, seated on the terrain.
+ * Pass `colliders` (an array) to collect circle footprints for solid props
+ * (those with a `collide` radius) so the scene can resolve movement against them.
+ */
+export function scatterProps(assets, three, prop, world, { center = { x: 0, z: 0 }, radius = 60, avoid = 8, colliders = null } = {}) {
   const count = scaledCount(prop.count, PERF.propScale);
   if (!count) return [];
 
@@ -50,6 +54,11 @@ export function scatterProps(assets, three, prop, world, { center = { x: 0, z: 0
     const x = center.x + Math.cos(a) * r;
     const z = center.z + Math.sin(a) * r;
     placements.push({ x, y: world ? world.getGroundHeight(x, z) : 0, z });
+  }
+
+  // register collision footprints for solid props (cheap circle colliders)
+  if (colliders && prop.collide) {
+    for (const p of placements) colliders.push({ x: p.x, z: p.z, r: prop.collide });
   }
 
   // Fast path: collapse the whole prop type into one InstancedMesh (1 draw call,
