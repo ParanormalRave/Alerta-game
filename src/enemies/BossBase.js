@@ -22,10 +22,14 @@ export class BossBase {
     this.dead = false;
     this.phase = 0; // 0,1,2
     this.float = !!def.float;
+    // horizontal collision footprint — bulky, but kept near the visible mass so
+    // melee can still reach the body (the swing ray hits the near surface).
+    this.radius = Math.max(1.0, (def.fitSize ?? 5) * 0.22);
 
     this.group = new THREE.Group();
     this.group.position.copy(spawnPos);
     this.group.userData.enemy = this; // raycastable like an enemy
+    this.home = spawnPos.clone();
 
     const scale = def.scale ?? 2.4;
     this.visual = assets.spawn(def.model, () => makeBoss(def, scale), {
@@ -51,6 +55,11 @@ export class BossBase {
     this.windup = 0;       // >0 while telegraphing
     this.pending = null;   // attack to fire when windup ends
     this.hitFlash = 0;
+    this.burnT = 0;
+    this.burnDps = 0;
+    this.burnTick = 0;
+    this.slowT = 0;
+    this.vulnT = 0;
     this.bobPhase = Math.random() * 10; // procedural lumber (GLBs have no anim)
 
     // The full-width boss meter is reserved for the final-portal Conqueror; realm
@@ -63,19 +72,53 @@ export class BossBase {
   get mesh() { return this.group; }
   get position() { return this.group.position; }
 
+  resetToHome() {
+    this.health = this.maxHealth;
+    this.dead = false;
+    this.phase = 0;
+    this.atkT = 1.5;
+    this.windup = 0;
+    this.pending = null;
+    this.hitFlash = 0;
+    this.burnT = 0;
+    this.burnDps = 0;
+    this.burnTick = 0;
+    this.slowT = 0;
+    this.vulnT = 0;
+    const y = (this.ctx.getGroundHeight?.(this.home.x, this.home.z) ?? this.home.y) + (this.float ? 1.5 : 0);
+    this.position.set(this.home.x, y, this.home.z);
+    this.visual.position.set(0, 0, 0);
+    this.visual.scale.setScalar(1);
+    this.visual.rotation.set(0, 0, 0);
+    if (this.showBar) this.ctx.ui?.setBossHealth(1);
+  }
+
   _phasePatterns() { return this.def.phases[this.phase]; }
 
   update(delta, playerPos, player) {
     if (this.dead) return false;
 
     if (this.hitFlash > 0) this.hitFlash -= delta * 4;
+    if (this.burnT > 0) {
+      this.burnT = Math.max(0, this.burnT - delta);
+      this.burnTick += delta;
+      if (this.burnTick >= 0.5) {
+        this.burnTick = 0;
+        this.health -= this.burnDps * 0.5;
+        this.ctx.particles?.emit(this.weakWorld(), { count: pc(5), color: 0xff5a1e, speed: 1.4, spread: 0.6, life: 0.35, up: 0.4 });
+        if (this.showBar) this.ctx.ui?.setBossHealth(Math.max(0, this.health / this.maxHealth));
+        if (this.health <= 0) { this._die(); return false; }
+      }
+    }
+    if (this.slowT > 0) this.slowT = Math.max(0, this.slowT - delta);
+    if (this.vulnT > 0) this.vulnT = Math.max(0, this.vulnT - delta);
     this.weak.rotation.y += delta * 1.5;
     this.weak.material.emissiveIntensity = 2 + Math.sin(this.ctx.now * 4) * 1;
 
     // slowly orient + advance on the player
     this.group.rotation.y = Math.atan2(playerPos.x - this.position.x, playerPos.z - this.position.z);
     const dist = _v.subVectors(playerPos, this.position).setY(0).length();
-    if (dist > 5) this._moveToward(playerPos, this.def.speed, delta);
+    if (dist > 5) this._moveToward(playerPos, this._moveSpeed(this.def.speed), delta);
 
     // ground clamp
     const fy = (this.ctx.getGroundHeight?.(this.position.x, this.position.z) ?? 0) + (this.float ? 1.5 : 0);
@@ -112,6 +155,10 @@ export class BossBase {
     _v.set(target.x - this.position.x, 0, target.z - this.position.z);
     const d = _v.length();
     if (d > 0.001) { _v.multiplyScalar((speed * delta) / d); this.position.x += _v.x; this.position.z += _v.z; }
+  }
+
+  _moveSpeed(base) {
+    return this.slowT > 0 ? base * 0.58 : base;
   }
 
   weakWorld() { return this.weak.getWorldPosition(_weak); }
@@ -165,10 +212,13 @@ export class BossBase {
 
   takeDamage(dmg, fromPos, weapon, point) {
     if (this.dead) return false;
+    this.applyStatus(weapon?.status, fromPos);
     // weak-point check: hit point near the marker → 2× damage
     let mult = 1;
     if (point && point.distanceTo(this.weakWorld()) < 1.0) { mult = 2; this.ctx.ui?.flashWeak(); }
+    if (this.vulnT > 0) mult *= 1.2;
     this.health -= dmg * mult;
+    this.lastDamageTaken = dmg * mult;
     this.hitFlash = 1;
     this.ctx.particles?.emit(point || this.weakWorld(), { count: pc(10), color: this.def.accent, speed: 3, life: 0.5 });
 
@@ -187,6 +237,18 @@ export class BossBase {
     this.ctx.particles?.emit(this.position.clone().setY(this.position.y + 2), { count: pc(160), color: this.def.accent, speed: 8, spread: 4, life: 1.8 });
     if (this.showBar) this.ctx.ui?.hideBoss();
     this.ctx.onDefeated?.(this);
+  }
+
+  applyStatus(status, fromPos) {
+    if (!status || this.dead) return;
+    if (status.burn) { this.burnT = Math.max(this.burnT, status.burn); this.burnDps = Math.max(this.burnDps, 8); }
+    if (status.slow) this.slowT = Math.max(this.slowT, status.slow);
+    if (status.vuln) this.vulnT = Math.max(this.vulnT, status.vuln);
+    if (status.stagger) this.atkT = Math.max(this.atkT, status.stagger);
+    if (status.push && fromPos) {
+      _v.subVectors(this.position, fromPos).setY(0);
+      if (_v.lengthSq() > 0.001) this.position.addScaledVector(_v.normalize(), status.push * 0.35);
+    }
   }
 
   dispose() {
