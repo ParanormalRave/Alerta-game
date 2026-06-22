@@ -14,9 +14,9 @@ function showFatal(message, detail) {
   document.body.appendChild(el);
 }
 
-// Boot loader: hold the LOADING card on a flat ~2.5s timer, then fade it out to
-// reveal the opening cinematic. Purely cosmetic — not tied to asset loading, so
-// keep it short; it only exists to mask the first-frame paint.
+// Boot loader: hold the LOADING card on a flat ~5s timer, then fade it out to
+// reveal the opening cinematic. Purely cosmetic — not tied to asset loading;
+// it masks the first-frame paint and gives the models a moment to stream in.
 // `.done` drops pointer-events immediately so the click-to-begin still lands
 // through the fade; the element is removed once the 0.8s fade finishes.
 const loader = document.getElementById('loader');
@@ -24,7 +24,7 @@ if (loader) {
   setTimeout(() => {
     loader.classList.add('done');
     setTimeout(() => loader.remove(), 900);
-  }, 2500);
+  }, 5000);
 }
 
 try {
