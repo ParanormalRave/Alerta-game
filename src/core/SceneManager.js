@@ -25,6 +25,7 @@ export class SceneManager {
 
     const rig = this.ctx.engine.cameraRig;
     if (rig.parent) rig.parent.remove(rig);  // detach before old scene disposes
+    this.ctx.engine.weapons?.clearSceneFx?.();
     if (this.current) this.current.exit();
 
     const scene = makeScene();
