@@ -1,0 +1,5 @@
+node_modules
+.env
+data
+boot.log
+boot.err
