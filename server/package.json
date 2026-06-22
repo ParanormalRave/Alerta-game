@@ -1,0 +1,22 @@
+{
+  "name": "zoal-0g-proxy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Tiny proxy that lets Chronicles of Zoal use 0G Compute (AI) and 0G Storage (saves) without players holding a wallet. Holds ONE dev-funded testnet key.",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@0glabs/0g-ts-sdk": "^0.3.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.0",
+    "express": "^4.19.2",
+    "openai": "^4.67.0"
+  }
+}
