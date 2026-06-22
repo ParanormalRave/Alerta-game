@@ -1,8 +1,11 @@
 // One knob for deadline-friendly performance cuts.
-// 0 = pretty, 1 = balanced (smooth + good-looking — the demo default),
-// 2 = fast, 3 = emergency laptop/potato mode.
-// Bump this UP if the demo machine chugs, DOWN (to 0) for screenshots/trailer.
-export const PERFORMANCE_LEVEL = 2;
+// 0 = pretty (full models + textures + lighting — the real look / screenshots),
+// 1 = balanced, 2 = fast, 3 = emergency laptop/potato mode.
+// NOTE: actor + weapon GLBs now load WITH textures at every level (see the
+// load*Models flags below); lower levels only cut render cost (shadows, postFX,
+// draw distance) and the heavy prop/skybox GLBs. Only level 0 textures the whole
+// environment. Bump this UP only if the machine actually chugs.
+export const PERFORMANCE_LEVEL = 0;
 
 const PROFILES = [
   {
@@ -91,8 +94,8 @@ const PROFILES = [
     spawnAddsScale: 0.75,
     loadSkybox: false,
     loadPropModels: false, // instanced placeholder props — skips the 16MB rock GLBs
-    loadActorModels: false,
-    loadWeaponModels: false,
+    loadActorModels: true,  // creatures/bosses load their textured GLBs at all levels
+    loadWeaponModels: true, // in-hand weapons too — both are too visible to fake
     loadCrashShipModel: true,
     crashEnvMap: false,
     crashTerrainSize: 48,
@@ -141,8 +144,8 @@ const PROFILES = [
     spawnAddsScale: 0.5,
     loadSkybox: false,
     loadPropModels: false,
-    loadActorModels: false,
-    loadWeaponModels: false,
+    loadActorModels: true,  // creatures/bosses load their textured GLBs at all levels
+    loadWeaponModels: true, // in-hand weapons too — both are too visible to fake
     loadCrashShipModel: false,
     crashEnvMap: false,
     crashTerrainSize: 40,
@@ -191,8 +194,8 @@ const PROFILES = [
     spawnAddsScale: 0.35,
     loadSkybox: false,
     loadPropModels: false,
-    loadActorModels: false,
-    loadWeaponModels: false,
+    loadActorModels: true,  // creatures/bosses load their textured GLBs at all levels
+    loadWeaponModels: true, // in-hand weapons too — both are too visible to fake
     loadCrashShipModel: false,
     crashEnvMap: false,
     crashTerrainSize: 32,
