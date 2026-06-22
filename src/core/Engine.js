@@ -11,7 +11,11 @@ import { SaveSystem } from './SaveSystem.js';
 import { HUD } from '../ui/HUD.js';
 import { Minimap } from '../ui/Minimap.js';
 import { Dialogue } from '../ui/Dialogue.js';
+import { DamageNumbers } from '../ui/DamageNumbers.js';
+import { AIDirector } from '../ai/AIDirector.js';
 import { gameState } from '../data/gameState.js';
+import { passiveBonuses, upgradeName } from '../data/upgrades.js';
+import { REALM_FOOTSTEP } from '../data/realms.js';
 import { PERF, pixelRatio } from './performance.js';
 
 /**
@@ -54,6 +58,8 @@ export class Engine {
     this.ui = new HUD();
     this.minimap = new Minimap();
     this.dialogue = new Dialogue();
+    this.damageNumbers = new DamageNumbers();
+    this.ai = new AIDirector(this.ui); // the Ember's voice, on 0G Compute
 
     // a placeholder scene so PostFX has something before the first load
     const boot = new THREE.Scene();
@@ -68,6 +74,8 @@ export class Engine {
       audio: this.audio,
       assets: this.assets,
       getScene: () => this.activeScene,
+      getParticles: () => (this.sceneManager.current ? this.sceneManager.current.particles : null),
+      player: this.player,
     });
 
     this.clock = new THREE.Clock();
@@ -75,6 +83,7 @@ export class Engine {
     this._freezeT = 0;
     this._hubIntroShown = false;
     this._hudT = 0;
+    this._footT = 0;
 
     // Opening cinematic state (the crash site). While `opening`, the loop drives
     // the scene's camera instead of the FPS controller; the first pointer-lock
@@ -86,13 +95,16 @@ export class Engine {
     this.ctx = {
       engine: this, assets: this.assets, audio: this.audio, ui: this.ui,
       dialogue: this.dialogue, player: this.player, camera: this.camera,
+      damageNumbers: this.damageNumbers, ai: this.ai,
     };
     this.sceneManager = new SceneManager(this.ctx);
 
-    // restore progress + reflect it on the HUD
+    // restore progress + reflect it on the HUD (localStorage = instant boot)
     SaveSystem.load();
-    gameState.inventory = this.weapons.owned.slice();
-    this.ui.setEmbers(gameState.embers.length);
+    this._applyLoadedState();
+    // then reconcile with the decentralized save on 0G Storage, in the
+    // background — adopts a newer cloud save (e.g. fresh device) without blocking.
+    SaveSystem.cloudSync(() => this._applyLoadedState());
 
     this._onResize = () => this._resize();
     window.addEventListener('resize', this._onResize);
@@ -142,16 +154,41 @@ export class Engine {
 
   save() { SaveSystem.save(); }
 
+  /** Reflect loaded gameState onto weapons + HUD (after local or cloud load). */
+  _applyLoadedState() {
+    if (gameState.inventory.length) this.weapons.setOwned(gameState.inventory);
+    else gameState.inventory = this.weapons.owned.slice();
+    this.applyPassiveUpgrades();
+    this.ui.setEmbers(gameState.embers.length);
+  }
+
+  applyPassiveUpgrades() {
+    this.player.applyPassiveBonuses(passiveBonuses(gameState.passiveUpgrades));
+    this.ui.setHealth(this.player.health, this.player.maxHealth);
+    this.ui.setStamina(this.player.stamina, this.player.maxStamina);
+  }
+
+  grantPassive(id) {
+    if (!id || gameState.passiveUpgrades.includes(id)) return false;
+    gameState.passiveUpgrades.push(id);
+    this.applyPassiveUpgrades();
+    this.ui.setObjective(`Passive acquired: ${upgradeName(id)}.`);
+    this.save();
+    return true;
+  }
+
   onPlayerDeath() {
     this.audio.play('player_death');
     this.ui.criticalFlash();
     this.ui.shake(220);
     this.ui.showDeath();
     this.ui.whiteFlash();
+    this.ai.reactToDeath(this.sceneManager.current?.realm);
     // reincarnate at the current scene's spawn with full vitality
     this.player.health = this.player.maxHealth;
     this.player.stamina = this.player.maxStamina;
     const s = this.sceneManager.current;
+    s?.resetActors?.();
     if (s?.spawnPoint) this.placePlayer(s.spawnPoint);
   }
 
@@ -175,7 +212,16 @@ export class Engine {
     const ent = target.userData.enemy;
     if (!ent) return;
     this.camera.getWorldPosition(this._tmpPos);
-    ent.takeDamage(dmg, this._tmpPos, weapon, point);
+    const realm = Number(gameState.currentScene) || 1;
+    const realmPower = 1 + Math.max(0, realm - 1) * 0.22;
+    const dealt = dmg * this.player.weaponDamageScale * realmPower;
+    ent.takeDamage(dealt, this._tmpPos, weapon, point);
+    const pos = point || ent.position;
+    const crit = !!point?.distanceTo && ent.weakWorld && point.distanceTo(ent.weakWorld()) < 1.0;
+    this.damageNumbers.spawn(pos.clone ? pos.clone() : this._tmpPos, dealt, {
+      color: weapon?.status?.burn ? '#ff8a3d' : weapon?.status?.slow ? '#80e6ff' : weapon?.status?.vuln ? '#caa2ff' : '#ffdf8a',
+      critical: crit,
+    });
     this.audio.play('sword_hit', { volume: 0.5 });
   }
 
@@ -215,9 +261,11 @@ export class Engine {
     const movementLocked = this._freezeT > 0 || this.dialogue.active;
     this.ui.setBriefing(this.dialogue.active);
     if (!movementLocked) this.player.update(delta);
+    this._updateFootsteps(delta, movementLocked);
 
     this.weapons.update(delta);
     this.sceneManager.update(delta, this.fpsCamera.position);
+    this.damageNumbers.update(delta, this.camera);
 
     this._handleInteraction();
 
@@ -256,6 +304,20 @@ export class Engine {
     }
   }
 
+  _updateFootsteps(delta, movementLocked) {
+    if (movementLocked || !this.player.moving || !this.player.grounded) {
+      this._footT = 0;
+      return;
+    }
+    this._footT -= delta;
+    if (this._footT > 0) return;
+    const scene = gameState.currentScene;
+    const key = REALM_FOOTSTEP[scene] || 'footstep_metal';
+    this.audio.play(key, { volume: this.player.sprinting ? 0.42 : 0.3, rate: 0.9 + Math.random() * 0.22 });
+    this._footT = this.player.sprinting ? 0.28 : 0.42;
+  }
+
+
   _cameraYaw() {
     this.camera.getWorldDirection(this._tmpPos);
     return Math.atan2(this._tmpPos.x, this._tmpPos.z);
@@ -273,5 +335,6 @@ export class Engine {
     window.removeEventListener('resize', this._onResize);
     this.input.dispose();
     this.renderer.dispose();
+    this.damageNumbers.dispose();
   }
 }
