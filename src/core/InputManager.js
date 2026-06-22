@@ -15,6 +15,8 @@ export class InputManager {
     this.justPressed = new Set();
     /** @type {Set<number>} currently-held mouse buttons (0 left, 1 middle, 2 right) */
     this.mouseButtons = new Set();
+    /** @type {Set<number>} mouse buttons that went down THIS frame */
+    this.justMousePressed = new Set();
     /** mouse movement delta accumulated since last frame */
     this.mouseDelta = { x: 0, y: 0 };
     this.isLocked = false;
@@ -28,10 +30,14 @@ export class InputManager {
     };
     this._onKeyUp = (e) => this.keys.delete(e.code);
     this._onMouseDown = (e) => {
+      if (e.button === 2) e.preventDefault();
       // While locked a click is a game action; while unlocked it (re)engages
       // mouse-look. There is no title screen, so this is how play begins and how
       // the cursor re-locks after ESC.
-      if (this.isLocked) this.mouseButtons.add(e.button);
+      if (this.isLocked) {
+        if (!this.mouseButtons.has(e.button)) this.justMousePressed.add(e.button);
+        this.mouseButtons.add(e.button);
+      }
       else this.requestLock();
     };
     this._onMouseUp = (e) => this.mouseButtons.delete(e.button);
@@ -52,6 +58,7 @@ export class InputManager {
       }
     };
     this._onOverlayClick = () => this.requestLock();
+    this._onContextMenu = (e) => e.preventDefault();
   }
 
   attach() {
@@ -60,6 +67,7 @@ export class InputManager {
     window.addEventListener('mousedown', this._onMouseDown);
     window.addEventListener('mouseup', this._onMouseUp);
     window.addEventListener('mousemove', this._onMouseMove);
+    window.addEventListener('contextmenu', this._onContextMenu);
     document.addEventListener('pointerlockchange', this._onLockChange);
     if (this.lockOverlay) {
       this.lockOverlay.addEventListener('click', this._onOverlayClick);
@@ -83,9 +91,15 @@ export class InputManager {
     return this.justPressed.has(code);
   }
 
+  /** True only on the frame a mouse button was first pressed. */
+  wasMousePressed(button) {
+    return this.justMousePressed.has(button);
+  }
+
   /** Clear per-frame edge state. Call once at the end of each update. */
   endFrame() {
     this.justPressed.clear();
+    this.justMousePressed.clear();
   }
 
   /** Consume and reset the accumulated mouse delta (call once per frame). */
@@ -102,6 +116,7 @@ export class InputManager {
     window.removeEventListener('mousedown', this._onMouseDown);
     window.removeEventListener('mouseup', this._onMouseUp);
     window.removeEventListener('mousemove', this._onMouseMove);
+    window.removeEventListener('contextmenu', this._onContextMenu);
     document.removeEventListener('pointerlockchange', this._onLockChange);
     if (this.lockOverlay) {
       this.lockOverlay.removeEventListener('click', this._onOverlayClick);
