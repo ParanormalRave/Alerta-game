@@ -1,0 +1,28 @@
+# Render Blueprint for the Zoal 0G proxy.
+# Deploy: render.com → New → Blueprint → connect this repo → pick this branch.
+# Render reads this file, creates the service, and prompts for the two secrets.
+services:
+  - type: web
+    name: zoal-0g-proxy
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: ZG_RPC_URL
+        value: https://evmrpc-testnet.0g.ai
+      - key: ZG_COMPUTE_BASE_URL
+        value: https://router-api.0g.ai/v1
+      - key: ZG_COMPUTE_MODEL
+        value: deepseek-v4-flash
+      # Allow any origin so the hosted game (wherever judges open it) can call in.
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      # Secrets — Render prompts for these at deploy (never stored in the repo).
+      - key: ZG_PRIVATE_KEY
+        sync: false
+      - key: ZG_COMPUTE_API_KEY
+        sync: false
