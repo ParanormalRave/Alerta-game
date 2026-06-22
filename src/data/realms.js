@@ -22,7 +22,8 @@ export const REALMS = {
     name: 'Cinderwood', sub: 'the ashen forest',
     biome: 'cinderwood', accent: '#ff5a1e',
     terrain: 'voxel',   // the first world is blocky/voxel; the rest are triangle
-    noBoss: true,       // no guardian here — just claim the ember to open two gates
+    // A semi-boss (the Smolder Stag) guards the Fire Ember — fell it, then claim
+    // the ember to open the next two gates.
     sky: { top: '#2a0f08', horizon: '#7a2410', bottom: '#1a0a06', fog: '#3a160c' },
     ember: { label: 'the Fire Ember', tint: 0xff5a1e },
     enemies: [
