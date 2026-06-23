@@ -4,7 +4,7 @@
 
 A browser-based FPS dungeon crawler / hack-and-slash built in Three.js. You play as a **World Weaver** — one of the last beings capable of reshaping reality. Explore shattered realms, fight corrupted creatures, collect **Worldshards**, and physically re-weave a broken world back together.
 
-**Built for [Hackathon Name] · [Year]**
+**Built for Zero Cup Hackathon · 2026**
 
 🎮 **[Play Now](https://alerta-game.vercel.app/)**
 
