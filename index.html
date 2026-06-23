@@ -12,6 +12,7 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..900;1,9..144,300..700&family=JetBrains+Mono:wght@400;500;700&display=swap"
       rel="stylesheet"
     />
+    <link rel="icon" type="image/png" href="/gamelogo.png" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
@@ -19,13 +20,12 @@
          Lives in the initial HTML so it paints before the JS module evaluates
          (no black-canvas flash). Dismissed on a flat timer in main.js. -->
     <div id="loader" aria-hidden="true">
-      <div class="loader-inner">
-        <span class="loader-kicker">The Chronicles of Zoal</span>
-        <div class="loader-line">
-          <span class="loader-word">LOADING</span>
-          <span class="loader-dots"><b>.</b><b>.</b><b>.</b></span>
-        </div>
-        <span class="loader-rule"><i></i></span>
+      <div class="loader-art">
+        <img class="loader-img" src="/loadinggame.png" alt="Loading — The Chronicles of Zoal" />
+        <!-- Mask retracts left→right over the baked-in light bar so the
+             segments appear to fill up as the boot timer runs. Its inset is
+             keyed to where the lit segments sit inside the PNG. -->
+        <span class="loader-fill" aria-hidden="true"></span>
       </div>
     </div>
 
@@ -142,8 +142,13 @@
     <!-- Scene-transition + cutscene wash -->
     <div id="fade"></div>
 
-    <!-- No title screen: the game opens straight onto the crash-site cinematic.
-         A click anywhere engages mouse-look (pointer lock) and begins play. -->
+    <!-- Opening title: the game logo floats over the crash-site cinematic.
+         A click anywhere engages mouse-look (pointer lock) and begins play;
+         the logo fades out as the guardian descends into the hub. -->
+    <div id="opening" aria-hidden="true">
+      <img class="opening-logo" src="/gamelogo.png" alt="The Chronicles of Zoal" />
+      <span class="opening-hint"><kbd>CLICK</kbd> to descend</span>
+    </div>
 
     <!-- Always-on command legend (outside #hud so it shows in the opening too).
          Toggle with H. -->

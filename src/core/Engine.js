@@ -118,7 +118,9 @@ export class Engine {
     // until play begins. The controls panel stays up so the player has a legend.
     this._hud = document.getElementById('hud');
     this._controls = document.getElementById('controls');
+    this._opening = document.getElementById('opening');
     if (this._hud) this._hud.style.display = 'none';
+    if (this._opening) { this._opening.style.display = ''; this._opening.classList.remove('done'); }
     this.weapons.holder.visible = false;
     this.sceneManager.loadOpening();
     this.renderer.setAnimationLoop(() => this._tick());
@@ -128,6 +130,10 @@ export class Engine {
   _beginGame() {
     this.opening = false;
     this.cinematicScene = null;
+    if (this._opening) {
+      this._opening.classList.add('done');
+      setTimeout(() => { if (this._opening) this._opening.style.display = 'none'; }, 900);
+    }
     if (this._hud) this._hud.style.display = '';
     this.weapons.holder.visible = true;
     this.freeze(1.2); // hold the controller through the fade + hub seating

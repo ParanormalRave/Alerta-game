@@ -472,6 +472,54 @@ body.shake #game { animation: shake 0.18s linear; }
   #vitals { width: 200px; }
 }
 
+/* =================== Opening title (crash-site logo) =================== */
+#opening {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none; /* clicks fall through to the canvas → pointer lock */
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: clamp(18px, 4vh, 40px);
+  padding-bottom: 6vh;
+  transition: opacity 0.8s ease;
+}
+#opening.done { opacity: 0; }
+.opening-logo {
+  width: min(64vw, 540px);
+  height: auto;
+  filter: drop-shadow(0 14px 40px rgba(0, 0, 0, 0.6));
+  animation: openingRise 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) both,
+             openingFloat 6s ease-in-out 1.4s infinite;
+}
+.opening-hint {
+  font-size: 13px;
+  letter-spacing: 0.36em;
+  text-transform: uppercase;
+  color: var(--paper);
+  animation: breathe 2.4s ease-in-out infinite;
+}
+.opening-hint kbd {
+  font-family: var(--mono);
+  letter-spacing: 0.08em;
+  padding: 2px 7px;
+  border: 1px solid var(--hair);
+  border-radius: 4px;
+  margin-right: 0.4em;
+}
+@keyframes openingRise {
+  from { opacity: 0; transform: translateY(26px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes openingFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .opening-logo { animation: none; }
+}
+
 /* =================== Boot loader =================== */
 #loader {
   position: fixed;
@@ -496,65 +544,51 @@ body.shake #game { animation: shake 0.18s linear; }
 }
 #loader.done { opacity: 0; pointer-events: none; }
 
-.loader-inner { position: relative; display: grid; justify-items: center; gap: 22px; text-align: center; }
-
-.loader-kicker {
-  font-family: var(--serif);
-  font-weight: 300;
-  font-size: clamp(11px, 1.4vw, 14px);
-  letter-spacing: 0.42em;
-  text-transform: uppercase;
-  color: var(--gold);
-  opacity: 0.78;
-  padding-left: 0.42em; /* offset trailing letter-spacing → optical centering */
-}
-
-.loader-line { display: flex; align-items: baseline; gap: 4px; }
-
-.loader-word {
-  font-family: var(--serif);
-  font-weight: 600;
-  font-size: clamp(2.6rem, 7vw, 4.2rem);
-  letter-spacing: 0.16em;
-  padding-left: 0.16em;
-  /* sweeping ember sheen across the letters */
-  background: linear-gradient(100deg, #7a5a32 0%, #ffce8a 26%, var(--ember) 50%, #ffce8a 74%, #7a5a32 100%);
-  background-size: 240% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: loaderShimmer 2.8s linear infinite;
-}
-
-.loader-dots { display: inline-flex; gap: 2px; align-self: flex-end; padding-bottom: 0.55em; }
-.loader-dots b {
-  font: 600 clamp(2rem, 5vw, 3rem) / 1 var(--serif);
-  color: var(--ember-soft);
-  animation: loaderBlink 1.4s infinite both;
-}
-.loader-dots b:nth-child(2) { animation-delay: 0.22s; }
-.loader-dots b:nth-child(3) { animation-delay: 0.44s; }
-
-.loader-rule {
+/* The loading art (logo + baked-in "LOADING…" + segmented light bar). */
+.loader-art {
+  position: relative;
   display: block;
-  width: clamp(170px, 24vw, 300px);
-  height: 1px;
-  background: var(--hair-soft);
-  overflow: hidden;
+  width: min(82vw, 560px);
+  line-height: 0;
 }
-.loader-rule i {
+.loader-img {
   display: block;
-  width: 38%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, var(--ember), transparent);
-  animation: loaderSweep 1.9s ease-in-out infinite;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 18px 38px rgba(0, 0, 0, 0.55));
 }
 
-@keyframes loaderShimmer { to { background-position: -240% 0; } }
-@keyframes loaderBlink { 0%, 100% { opacity: 0.2; } 50% { opacity: 1; } }
-@keyframes loaderSweep { 0% { transform: translateX(-130%); } 100% { transform: translateX(330%); } }
+/* Mask over the baked-in light bar. It sits in unlit-track colour covering the
+   whole strip, then retracts left→right (scaleX toward the right edge) so the
+   lights underneath appear to fill up across the boot timer. Inset values are
+   keyed to where the lit segments sit inside loadinggame.png. */
+.loader-fill {
+  position: absolute;
+  left: 30.4%;
+  width: 30.3%;
+  top: 59%;
+  height: 6.6%;
+  background: linear-gradient(90deg, rgb(40, 31, 15) 0%, rgb(50, 39, 19) 100%);
+  transform-origin: right center;
+  transform: scaleX(1);
+  animation: loaderFill 5s cubic-bezier(0.45, 0.05, 0.35, 1) forwards;
+}
+/* Ember glow riding the leading (left) edge of the retreating mask. */
+.loader-fill::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  top: -55%;
+  width: 12px;
+  height: 210%;
+  background: radial-gradient(closest-side, rgba(255, 150, 60, 0.85), rgba(255, 110, 30, 0) 72%);
+  filter: blur(1px);
+}
+
+@keyframes loaderFill { to { transform: scaleX(0); } }
 @keyframes loaderHaze { 0%, 100% { opacity: 0.5; transform: scale(0.96); } 50% { opacity: 1; transform: scale(1.04); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .loader-word, .loader-dots b, .loader-rule i, #loader::before { animation: none; }
+  #loader::before { animation: none; }
+  .loader-fill { animation-duration: 0.01s; }
 }
