@@ -2,7 +2,7 @@
 
 > *"The world itself is the health bar."*
 
-A browser-based isometric action RPG where you play as a **World Weaver** — one of the last beings capable of reshaping reality by placing magical blocks. Explore shattered realms, fight corrupted creatures, collect **Worldshards**, and physically re-weave a broken world back together.
+A browser-based FPS dungeon crawler / hack-and-slash built in Three.js. You play as a **World Weaver** — one of the last beings capable of reshaping reality. Explore shattered realms, fight corrupted creatures, collect **Worldshards**, and physically re-weave a broken world back together.
 
 **Built for [Hackathon Name] · [Year]**
 
@@ -21,9 +21,9 @@ Rush through and fight it at full strength. Explore fully, and you fight a wound
 
 ## ⚔️ Gameplay
 
-- **Genre:** Isometric Action-RPG *(Minecraft Dungeons-style)*
+- **Genre:** FPS dungeon crawler / hack-and-slash
+- **Engine:** Three.js (browser-based, no install required)
 - **Playtime:** ~4–5 hours
-- **Controls:** WASD to move, Mouse to look, Click to attack
 
 ### Core Loop
 ```
@@ -52,7 +52,7 @@ The final boss scales based on how many Worldshards you placed:
 
 ## ⛓️ Blockchain Integration (0G Network)
 
-Player actions and game state are persisted on-chain using **[0G Storage](https://0g.ai/)** — decentralized, device-agnostic, and tamper-proof. No traditional backend. No save files that die with your browser.
+Player progress is persisted on-chain via **[0G Network](https://0g.ai/)** — decentralized, device-agnostic, and tamper-proof. **Players don't need a wallet.** A dev-funded testnet key in the proxy server covers all on-chain writes so the experience is frictionless.
 
 ### What's Stored On-Chain
 - Worldshards collected and placed
@@ -60,10 +60,19 @@ Player actions and game state are persisted on-chain using **[0G Storage](https:
 - Ember Shard (crafting currency) count
 - Boss power tier at time of final fight
 
-### Why 0G?
-0G Storage works standalone — no chain migration needed. It plugs directly into the existing browser-based game, replacing `localStorage` with decentralized storage at a fraction of the cost of alternatives. Player state follows the wallet, not the device.
+### Architecture
+```
+Browser (Three.js game)
+       │
+       │  REST  (save / load / ember AI)
+       ▼
+zoal-0g-proxy  (Node.js / Express)
+       │
+       ├── 0G Chain     →  save state anchored on-chain (ethers + 0g-ts-sdk)
+       └── 0G Compute   →  AI-driven in-game narration via the Ember
+```
 
-> State is committed at **checkpoints and altar placements**, not on every action — keeping writes infrequent and gas-efficient.
+> State is committed at **checkpoints and altar placements**, not on every action — keeping writes infrequent and cost-efficient.
 
 ---
 
@@ -71,11 +80,15 @@ Player actions and game state are persisted on-chain using **[0G Storage](https:
 
 | Layer | Tech |
 |---|---|
-| Game Engine | *(e.g. Three.js / Phaser / Babylon.js)* |
-| Frontend | *(e.g. Vanilla JS / React / Vite)* |
-| Deployment | Vercel |
-| Blockchain Storage | 0G Network (0G Storage SDK) |
-| Wallet | *(e.g. MetaMask / WalletConnect)* |
+| Game Engine | [Three.js](https://threejs.org/) r160 |
+| Physics | [Rapier3D](https://rapier.rs/) (WASM) |
+| Audio | [Howler.js](https://howlerjs.com/) |
+| Procedural Noise | simplex-noise |
+| Build Tool | Vite 5 |
+| Proxy Server | Node.js 18+ / Express |
+| Blockchain SDK | [@0glabs/0g-ts-sdk](https://github.com/0glabs/0g-ts-sdk) + ethers v6 |
+| AI Narration | 0G Compute (OpenAI-compatible) |
+| Deployment | Vercel (frontend) |
 
 ---
 
@@ -83,32 +96,45 @@ Player actions and game state are persisted on-chain using **[0G Storage](https:
 
 ### Prerequisites
 - Node.js `>=18`
-- A Web3 wallet (MetaMask recommended)
+- npm
 
-### Local Development
+### 1. Clone & install
 
 ```bash
-# Clone the repo
-git clone https://github.com/<your-username>/alerta-game.git
-cd alerta-game
-
-# Install dependencies
-npm install   # or bun install
-
-# Start dev server
-npm run dev   # or bun dev
+git clone https://github.com/ParanormalRave/Alerta-game.git
+cd Alerta-game
+npm install
 ```
 
-Open `http://localhost:3000` (or whichever port your bundler uses) in your browser.
+### 2. Configure the proxy server
 
-### Environment Variables
+```bash
+cd server
+npm install
+cp .env.example .env   # fill in your 0G testnet key
+```
 
 ```env
-# .env.example
-VITE_0G_STORAGE_RPC=
-VITE_0G_CHAIN_ID=
-VITE_WALLET_CONNECT_PROJECT_ID=
+# server/.env
+ZG_PRIVATE_KEY=          # dev-funded 0G testnet wallet private key
+ZG_RPC_URL=              # 0G Galileo RPC endpoint
+ZG_FLOW_CONTRACT=        # 0G Flow contract address
+OPENAI_BASE_URL=         # 0G Compute endpoint (OpenAI-compatible)
+OPENAI_API_KEY=          # 0G Compute API key
+ALLOWED_ORIGINS=http://localhost:5173
 ```
+
+### 3. Run locally
+
+```bash
+# Terminal 1 — proxy server
+npm run proxy
+
+# Terminal 2 — game dev server
+npm run dev
+```
+
+Open `http://localhost:5173` in your browser.
 
 ---
 
@@ -123,9 +149,10 @@ VITE_WALLET_CONNECT_PROJECT_ID=
 | `SPACE` | Leap |
 | `SHIFT` | Run |
 | `1–8` | Switch Weapon |
+| `Q` | Last Weapon |
 | `R` | Reload |
 | `M` | Map / Survey |
-| `H` | Toggle Controls |
+| `H` | Toggle Controls Help |
 | `ESC` | Free Cursor |
 
 ---
@@ -133,14 +160,21 @@ VITE_WALLET_CONNECT_PROJECT_ID=
 ## 🗺️ Project Structure
 
 ```
-alerta-game/
+Alerta-game/
 ├── src/
-│   ├── game/           # Core game logic (engine, entities, combat)
-│   ├── blockchain/     # 0G Storage integration, wallet connection
-│   ├── ui/             # HUD, menus, lore popups
-│   └── assets/         # Models, textures, audio
-├── public/
-└── README.md
+│   ├── core/           # Engine bootstrap, render loop
+│   ├── style.css       # Global styles & HUD
+│   └── main.js         # Entry point
+├── server/
+│   ├── lib/
+│   │   ├── chain.js    # 0G Chain save/load logic
+│   │   ├── storage.js  # 0G Storage SDK (parked — SDK sync pending)
+│   │   └── ember.js    # 0G Compute / AI narration
+│   └── index.js        # Express proxy server
+├── public/             # Static assets (logo, loading screen)
+├── index.html
+├── vite.config.js
+└── package.json
 ```
 
 ---
